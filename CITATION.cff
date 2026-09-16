@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: Santali AI
+authors:
+  - family-names: Contributors
+    given-names: Santali AI
+version: 0.1.0
+date-released: 2026-09-16
+license: MIT
+repository-code: https://github.com/REPLACE_WITH_OWNER/santali-ai
+abstract: Open data-first stack for Santali translation, conversational assistance and future speech interfaces.

@@ -1,0 +1,37 @@
+project: santali-ai
+language_codes:
+  santali_olchiki: sat_Olck
+  hindi_devanagari: hin_Deva
+  english_latin: eng_Latn
+sources:
+  - id: ai4bharat_bpcc
+    url: https://huggingface.co/datasets/ai4bharat/BPCC
+    task: translation
+    status: candidate
+    train: true
+    license_review_required: true
+  - id: flores_plus
+    url: https://huggingface.co/datasets/openlanguagedata/flores_plus
+    task: evaluation
+    status: held_out_only
+    train: false
+    license: CC-BY-SA-4.0
+  - id: ai4bharat_rasa
+    url: https://huggingface.co/datasets/ai4bharat/Rasa
+    task: tts
+    status: candidate
+    train: false
+    license: CC-BY-4.0
+    note: Accept access terms and preserve attribution.
+  - id: common_voice_santali
+    url: https://commonvoice.mozilla.org/
+    task: asr
+    status: verify_current_release
+    train: false
+    license: verify_release_terms
+  - id: santali_wikipedia
+    url: https://sat.wikipedia.org/
+    task: text_and_rag
+    status: candidate
+    train: false
+    license: verify_page_and_dataset_terms

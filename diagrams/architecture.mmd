@@ -1,0 +1,25 @@
+flowchart LR
+  U[User: Ol Chiki / Hindi / English] --> L[Language + script detection]
+  L --> T[Translation gateway]
+  T --> MT[IndicTrans2
+  hin_Deva <-> sat_Olck
+  eng_Latn <-> sat_Olck]
+  T --> R[Retriever]
+  R --> KB[(Approved RAG knowledge base)]
+  KB --> G[Qwen3 Instruct
+  LoRA/QLoRA adapter]
+  G --> T
+  MT --> A[Text response]
+  A --> V{Voice requested?}
+  V -- No --> O[Chat/API/Telegram]
+  V -- Yes --> S[IndicF5 or Indic Parler-TTS]
+  S --> O
+  I[Audio input] --> ASR[AI4Bharat IndicConformer Santali ASR]
+  ASR --> L
+  D[Public online data] --> C[License + provenance check]
+  C --> P[Unicode/script/dedup/filter]
+  P --> X[Train/dev/test split]
+  X --> K[Kaggle GPU fine-tuning]
+  K --> E[BLEU + chrF + human review]
+  E --> MT
+  E --> G
