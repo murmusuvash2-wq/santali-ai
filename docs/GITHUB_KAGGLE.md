@@ -17,10 +17,9 @@ The official Kaggle CLI documents that `kaggle kernels push` uploads the kernel 
    ```
 
 2. In GitHub repository settings, open **Secrets and variables → Actions**.
-3. Add these repository secrets:
+3. Add this repository secret:
 
    ```text
-   KAGGLE_USERNAME     your Kaggle username
    KAGGLE_API_TOKEN    your Kaggle API token
    ```
 
