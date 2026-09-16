@@ -13,7 +13,7 @@ The official Kaggle CLI documents that `kaggle kernels push` uploads the kernel 
 1. In Kaggle, create or authorize the private kernel whose ID is in `kaggle/kernel/kernel-metadata.json`:
 
    ```text
-   murmusuvash2-wq/santali-ai-translation
+   ezqrio/santali-ai-translation
    ```
 
 2. In GitHub repository settings, open **Secrets and variables → Actions**.
