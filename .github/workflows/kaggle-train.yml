@@ -22,7 +22,9 @@ permissions:
 jobs:
   push-and-run-kaggle:
     runs-on: ubuntu-latest
-    # Required repository secret: KAGGLE_API_TOKEN.
+    # Required repository secrets:
+    #   KAGGLE_USERNAME -> username from kaggle.json ("username" field)
+    #   KAGGLE_KEY      -> API key from kaggle.json ("key" field)
     # The Kaggle account must have a kernel with the slug in kaggle/kernel-metadata.json.
     steps:
       - name: Checkout repository
@@ -38,9 +40,15 @@ jobs:
 
       - name: Configure Kaggle authentication
         env:
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
         run: |
-          test -n "$KAGGLE_API_TOKEN" || (echo 'Missing KAGGLE_API_TOKEN secret' && exit 1)
+          test -n "$KAGGLE_USERNAME" || { echo 'Missing KAGGLE_USERNAME secret' && exit 1; }
+          test -n "$KAGGLE_KEY" || { echo 'Missing KAGGLE_KEY secret' && exit 1; }
+          mkdir -p ~/.kaggle
+          printf '{"username":"%s","key":"%s"}\n' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+          echo "kaggle.json written: $(test -f ~/.kaggle/kaggle.json && echo YES)"
 
       - name: Push and run Kaggle kernel
         env:
