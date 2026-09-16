@@ -21,7 +21,6 @@ permissions:
 
 jobs:
   push-and-run-kaggle:
-    if: ${{ secrets.KAGGLE_API_TOKEN != '' && secrets.KAGGLE_USERNAME != '' }}
     runs-on: ubuntu-latest
     # Required repository secrets: KAGGLE_API_TOKEN and KAGGLE_USERNAME.
     # The Kaggle account must have a kernel with the slug in kaggle/kernel-metadata.json.
