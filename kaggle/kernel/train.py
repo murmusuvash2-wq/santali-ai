@@ -11,6 +11,7 @@ import json
 import os
 import random
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -26,13 +27,14 @@ INPUT_CSV = os.environ.get(
 OUT = Path("/kaggle/working/santali-output")
 DATA_DIR = OUT / "data"
 ADAPTER_DIR = OUT / "adapter"
-MODEL_ID = "ai4bharat/indictrans2-indic-indic-dist-320M"
+MODEL_ID = os.environ.get(
+    "MODEL_ID", "ai4bharat/indictrans2-indic-indic-dist-320M"
+)
 SRC_LANG = "hin_Deva"
 TGT_LANG = "sat_Olck"
 OL_CHIKI = re.compile(r"[\u1C50-\u1C7F]")
 EPOCHS = float(os.environ.get("EPOCHS", "3"))
 
-# Critical for training; optional packages are best-effort only.
 CRITICAL_PKGS = [
     "transformers",
     "datasets",
@@ -40,10 +42,6 @@ CRITICAL_PKGS = [
     "peft",
     "sentencepiece",
     "pandas",
-]
-OPTIONAL_PKGS = [
-    "sacrebleu",
-    "evaluate",
 ]
 
 
@@ -76,8 +74,7 @@ def _import_ok(mod: str) -> bool:
         return False
 
 
-def _pip_install(spec: str, retries: int = 3) -> bool:
-    """Install one package; return True on success."""
+def _pip_install(spec: str, retries: int = 2) -> bool:
     for attempt in range(1, retries + 1):
         try:
             log(f"  pip install {spec} (attempt {attempt}/{retries})")
@@ -92,27 +89,19 @@ def _pip_install(spec: str, retries: int = 3) -> bool:
                     "--no-input",
                     spec,
                 ],
-                timeout=300,
+                timeout=180,
             )
             return True
         except Exception as e:
             log(f"  pip failed for {spec}: {e}")
             if attempt < retries:
-                wait = 10 * attempt
-                log(f"  retrying in {wait}s...")
-                time.sleep(wait)
+                time.sleep(5 * attempt)
     return False
 
 
 def install_deps() -> None:
-    """Prefer Kaggle preinstalled packages; only pip what is missing.
-
-    Network on Kaggle can flake (DNS Temporary failure). Never block
-    training on optional packages like sacrebleu/evaluate.
-    """
+    """Prefer Kaggle preinstalled packages. Never install optional metrics pkgs."""
     log("Checking training dependencies...")
-
-    # Map pip name -> import name when different
     import_name = {
         "sentencepiece": "sentencepiece",
         "transformers": "transformers",
@@ -120,41 +109,103 @@ def install_deps() -> None:
         "accelerate": "accelerate",
         "peft": "peft",
         "pandas": "pandas",
-        "sacrebleu": "sacrebleu",
-        "evaluate": "evaluate",
     }
-
-    missing_critical = []
+    missing = []
     for pkg in CRITICAL_PKGS:
         mod = import_name.get(pkg, pkg)
         if _import_ok(mod):
             log(f"  OK preinstalled: {pkg}")
         else:
             log(f"  missing: {pkg}")
-            missing_critical.append(pkg)
+            missing.append(pkg)
 
-    for pkg in missing_critical:
+    for pkg in missing:
         ok = _pip_install(pkg)
         if not ok or not _import_ok(import_name.get(pkg, pkg)):
             raise RuntimeError(
-                f"Critical package '{pkg}' is not available and pip install failed.\n"
-                "Ensure the kernel has Internet enabled (enable_internet: true) "
-                "and re-run. Kaggle DNS sometimes fails transiently."
+                f"Critical package '{pkg}' missing and pip install failed.\n"
+                "Kernel needs working Internet (enable_internet: true). "
+                "Kaggle DNS can fail transiently — re-run the kernel."
+            )
+    log("Dependency check done (optional metrics packages skipped).")
+
+
+def network_ok(host: str = "huggingface.co", port: int = 443, timeout: float = 5.0) -> bool:
+    try:
+        socket.setdefaulttimeout(timeout)
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError as e:
+        log(f"Network probe to {host}:{port} failed: {e}")
+        return False
+
+
+def resolve_model_path() -> str:
+    """Prefer a local Kaggle input copy of the model so HF download is not required."""
+    env = os.environ.get("MODEL_PATH", "").strip()
+    if env and Path(env).exists():
+        log(f"Using MODEL_PATH={env}")
+        return env
+
+    # Any attached dataset that already has config.json (model weights)
+    for cfg in Path("/kaggle/input").rglob("config.json"):
+        parent = cfg.parent
+        # skip tiny / non-model dirs
+        if (parent / "pytorch_model.bin").exists() or list(parent.glob("*.safetensors")):
+            log(f"Found local model at {parent}")
+            return str(parent)
+
+    return MODEL_ID
+
+
+def load_tokenizer_and_model(model_ref: str):
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+    last_err: Exception | None = None
+    is_local = Path(model_ref).exists()
+
+    if not is_local:
+        # Warm up / wait for DNS — Kaggle often flakes for a few minutes
+        for probe in range(1, 6):
+            if network_ok():
+                log(f"Network OK (probe {probe})")
+                break
+            wait = 15 * probe
+            log(f"Waiting for network ({wait}s)...")
+            time.sleep(wait)
+        else:
+            raise RuntimeError(
+                "Cannot reach huggingface.co (DNS/network failure).\n"
+                "Options:\n"
+                "  1. Re-run this kernel (transient Kaggle DNS issue)\n"
+                "  2. Attach model weights as a Kaggle dataset and set MODEL_PATH\n"
+                "  3. Confirm Settings → Internet is ON for this notebook/kernel"
             )
 
-    for pkg in OPTIONAL_PKGS:
-        mod = import_name.get(pkg, pkg)
-        if _import_ok(mod):
-            log(f"  OK optional: {pkg}")
-            continue
-        if not _pip_install(pkg, retries=2):
-            log(f"  skipping optional {pkg} (not required for LoRA train)")
+    for attempt in range(1, 6):
+        try:
+            log(f"Loading model from {model_ref} (attempt {attempt}/5)")
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_ref, trust_remote_code=True
+            )
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                model_ref, trust_remote_code=True
+            )
+            return tokenizer, model
+        except Exception as e:
+            last_err = e
+            log(f"  load failed: {type(e).__name__}: {e}")
+            time.sleep(min(60, 10 * attempt))
 
-    log("Dependency check done.")
+    raise RuntimeError(
+        f"Failed to load model {model_ref} after retries.\n"
+        f"Last error: {last_err}\n"
+        "If this is a network error, re-run or attach the model as a Kaggle dataset."
+    ) from last_err
 
 
 # ---------------------------------------------------------------------------
-# Data prep (inlined)
+# Data prep
 # ---------------------------------------------------------------------------
 def normalize_rows(rows: list[dict]) -> list[dict]:
     for r in rows:
@@ -220,8 +271,8 @@ def prepare_data() -> Path:
         else:
             raise FileNotFoundError(
                 f"Input CSV not found: {INPUT_CSV}\n"
-                f"/kaggle/input contents: {list(Path('/kaggle/input').rglob('*'))[:30]}\n"
-                "Attach dataset ezqrio/approved-parallel to the kernel."
+                f"/kaggle/input: {list(Path('/kaggle/input').rglob('*'))[:30]}\n"
+                "Attach dataset ezqrio/approved-parallel."
             )
 
     log(f"Reading {csv_path}")
@@ -254,18 +305,12 @@ def prepare_data() -> Path:
 
 
 # ---------------------------------------------------------------------------
-# LoRA training (inlined)
+# LoRA training
 # ---------------------------------------------------------------------------
 def train_lora(data_dir: Path) -> None:
     import pandas as pd
     from datasets import Dataset, DatasetDict
-    from transformers import (
-        AutoModelForSeq2SeqLM,
-        AutoTokenizer,
-        DataCollatorForSeq2Seq,
-        Seq2SeqTrainer,
-        Seq2SeqTrainingArguments,
-    )
+    from transformers import DataCollatorForSeq2Seq, Seq2SeqTrainer, Seq2SeqTrainingArguments
     from peft import LoraConfig, TaskType, get_peft_model
 
     def load_csv(path: Path) -> Dataset:
@@ -282,9 +327,8 @@ def train_lora(data_dir: Path) -> None:
     ds = DatasetDict({s: load_csv(data_dir / f"{s}.csv") for s in ("train", "validation", "test")})
     log(f"Dataset sizes: { {k: len(v) for k, v in ds.items()} }")
 
-    log(f"Loading model {MODEL_ID}")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
-    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, trust_remote_code=True)
+    model_ref = resolve_model_path()
+    tokenizer, model = load_tokenizer_and_model(model_ref)
 
     peft_config = LoraConfig(
         task_type=TaskType.SEQ_2_SEQ_LM,
@@ -344,8 +388,7 @@ def train_lora(data_dir: Path) -> None:
 
     log("Evaluating on test set...")
     metrics = trainer.evaluate(tokenized["test"])
-    metrics_path = ADAPTER_DIR / "metrics.json"
-    metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    (ADAPTER_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     log(json.dumps(metrics, indent=2))
     log(f"Artifacts saved to {ADAPTER_DIR}")
 
