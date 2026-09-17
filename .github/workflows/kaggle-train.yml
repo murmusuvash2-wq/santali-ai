@@ -39,6 +39,7 @@ jobs:
           fi
 
       - name: Notify Telegram - training started
+        continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
@@ -88,6 +89,7 @@ jobs:
 
       - name: Notify Telegram - training finished
         if: always()
+        continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           JOB_STATUS: ${{ job.status }}
