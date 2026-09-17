@@ -7,6 +7,10 @@ on:
         description: Kaggle accelerator
         required: false
         default: NvidiaTeslaT4
+      skip_model_upload:
+        description: Skip model dataset upload if already on Kaggle
+        required: false
+        default: 'false'
   push:
     branches: [main]
     paths:
@@ -15,6 +19,7 @@ on:
       - 'configs/**'
       - 'kaggle/**'
       - 'requirements.txt'
+      - '.github/workflows/kaggle-train.yml'
 
 permissions:
   contents: read
@@ -24,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      HF_MODEL_ID: ai4bharat/indictrans2-indic-indic-dist-320M
+      KAGGLE_MODEL_DATASET: ezqrio/indictrans2-320m
 
     steps:
       - name: Checkout repository
@@ -46,7 +53,7 @@ jobs:
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=Santali AI training started. Kaggle kernel is being pushed to GPU. Track: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
+              --data-urlencode "text=Santali AI training started. Model + data will be pushed to Kaggle. Track: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
           else
             echo "Telegram alert skipped: TELEGRAM_BOT_TOKEN secret is not configured."
           fi
@@ -56,19 +63,81 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Kaggle CLI
-        run: python -m pip install --upgrade kaggle
+      - name: Install CLI tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade kaggle huggingface_hub
 
       - name: Prepare approved parallel dataset
         run: python scripts/prepare_mod4_kaggle_dataset.py --output-dir .kaggle-dataset
 
-      - name: Create or update private Kaggle dataset
+      - name: Create or update private parallel dataset
         run: |
           if kaggle datasets status ezqrio/approved-parallel >/dev/null 2>&1; then
             kaggle datasets version -p .kaggle-dataset -m "Refresh approved Mod4 corpus" -q -t -r skip
           else
             kaggle datasets create -p .kaggle-dataset -q -t -r skip
           fi
+
+      - name: Download IndicTrans2 model (GitHub Actions has internet)
+        if: ${{ github.event.inputs.skip_model_upload != 'true' }}
+        run: |
+          set -e
+          mkdir -p .kaggle-model
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          import os
+          path = snapshot_download(
+              repo_id=os.environ["HF_MODEL_ID"],
+              local_dir=".kaggle-model",
+              local_dir_use_symlinks=False,
+          )
+          print("Downloaded model to", path)
+          PY
+          # Kaggle dataset metadata
+          cat > .kaggle-model/dataset-metadata.json <<'EOF'
+          {
+            "title": "IndicTrans2 320M (Indic-Indic dist)",
+            "id": "ezqrio/indictrans2-320m",
+            "licenses": [{"name": "MIT"}]
+          }
+          EOF
+          # Remove git / cache junk if any
+          rm -rf .kaggle-model/.cache .kaggle-model/.gitattributes || true
+          echo "Model folder size:"
+          du -sh .kaggle-model
+          ls -la .kaggle-model | head -30
+
+      - name: Create or update model dataset on Kaggle
+        if: ${{ github.event.inputs.skip_model_upload != 'true' }}
+        run: |
+          set -e
+          if kaggle datasets status "$KAGGLE_MODEL_DATASET" >/dev/null 2>&1; then
+            echo "Updating existing model dataset $KAGGLE_MODEL_DATASET"
+            kaggle datasets version -p .kaggle-model -m "Refresh IndicTrans2 320M weights" -q -t -r skip
+          else
+            echo "Creating model dataset $KAGGLE_MODEL_DATASET"
+            kaggle datasets create -p .kaggle-model -q -t -r skip
+          fi
+          echo "Model dataset ready: https://www.kaggle.com/datasets/ezqrio/indictrans2-320m"
+
+      - name: Ensure kernel metadata attaches model + data
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          meta_path = Path("kaggle/kernel/kernel-metadata.json")
+          meta = json.loads(meta_path.read_text())
+          sources = meta.get("dataset_sources") or []
+          for ds in ["ezqrio/approved-parallel", "ezqrio/indictrans2-320m"]:
+              if ds not in sources:
+                  sources.append(ds)
+          meta["dataset_sources"] = sources
+          meta["enable_internet"] = True
+          meta["enable_gpu"] = True
+          meta_path.write_text(json.dumps(meta, indent=2) + "\n")
+          print(meta_path.read_text())
+          PY
 
       - name: Push and run Kaggle kernel
         env:
