@@ -4,7 +4,7 @@ Load order for the base model:
   1. MODEL_PATH env (explicit local folder)
   2. Known Kaggle input dataset folders
   3. Any /kaggle/input/**/config.json that has model weights
-  4. HuggingFace hub (needs working Internet)
+  4. HuggingFace hub (needs working Internet) — fail fast, no long waits
 """
 from __future__ import annotations
 
@@ -43,7 +43,6 @@ CRITICAL_PKGS = [
     "pandas",
 ]
 
-# Prefer these local folders if the user attaches a model dataset on Kaggle.
 LOCAL_MODEL_CANDIDATES = [
     os.environ.get("MODEL_PATH", "").strip(),
     "/kaggle/input/indictrans2-320m",
@@ -65,7 +64,7 @@ def debug_layout() -> None:
     for root in [Path("/kaggle/src"), Path("/kaggle/working"), Path("/kaggle/input")]:
         if root.exists():
             log(f"{root}:")
-            for p in sorted(root.rglob("*"))[:50]:
+            for p in sorted(root.rglob("*"))[:60]:
                 if p.is_file():
                     log(f"  {p}")
     log("=" * 60)
@@ -132,7 +131,6 @@ def _looks_like_model_dir(path: Path) -> bool:
 
 def resolve_model_source() -> str:
     """Local Kaggle input first, else HuggingFace id."""
-    # 1) Explicit candidates
     for raw in LOCAL_MODEL_CANDIDATES:
         if not raw:
             continue
@@ -140,14 +138,12 @@ def resolve_model_source() -> str:
         if _looks_like_model_dir(p):
             log(f"Using LOCAL model: {p}")
             return str(p)
-        # sometimes weights sit one level deeper
         if p.is_dir():
             for sub in p.iterdir():
                 if _looks_like_model_dir(sub):
                     log(f"Using LOCAL model: {sub}")
                     return str(sub)
 
-    # 2) Auto-scan all attached inputs
     input_root = Path("/kaggle/input")
     if input_root.exists():
         for cfg in input_root.rglob("config.json"):
@@ -156,13 +152,12 @@ def resolve_model_source() -> str:
                 log(f"Using LOCAL model (auto): {parent}")
                 return str(parent)
 
-    # 3) HuggingFace
-    log(f"No local model found under /kaggle/input — will load from HuggingFace: {HF_MODEL_ID}")
-    log("Tip: upload model as Kaggle dataset (e.g. ezqrio/indictrans2-320m) to skip HF download.")
+    log(f"No local model under /kaggle/input — HF id: {HF_MODEL_ID}")
+    log("Attach dataset ezqrio/indictrans2-320m to avoid network dependency.")
     return HF_MODEL_ID
 
 
-def network_ok(host: str = "huggingface.co", port: int = 443, timeout: float = 5.0) -> bool:
+def network_ok(host: str = "huggingface.co", port: int = 443, timeout: float = 3.0) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
             return True
@@ -177,38 +172,40 @@ def load_tokenizer_and_model(model_ref: str):
     is_local = Path(model_ref).exists()
     last_err: Exception | None = None
 
-    if not is_local:
-        for probe in range(1, 6):
-            if network_ok():
-                log(f"Network OK (probe {probe})")
-                break
-            wait = 15 * probe
-            log(f"Waiting for network ({wait}s)...")
-            time.sleep(wait)
-        else:
-            raise RuntimeError(
-                "Cannot reach huggingface.co and no local model attached.\n"
-                "Fix options:\n"
-                "  A) Re-run kernel (Kaggle DNS often recovers)\n"
-                "  B) Upload IndicTrans2 weights as a Kaggle dataset and Add Input\n"
-                "     Suggested folder names: indictrans2-320m / indictrans2\n"
-                "  C) Settings → Internet = ON"
-            )
+    if is_local:
+        log(f"Loading LOCAL model (no network wait): {model_ref}")
+        tokenizer = AutoTokenizer.from_pretrained(model_ref, trust_remote_code=True, local_files_only=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_ref, trust_remote_code=True, local_files_only=True)
+        log("Model loaded successfully from local disk.")
+        return tokenizer, model
 
-    for attempt in range(1, 6):
+    # Remote HF path — fail fast, do NOT wait minutes for DNS
+    if not network_ok():
+        raise RuntimeError(
+            "No local model attached and huggingface.co is unreachable (DNS/network).\n"
+            "Do NOT wait — fix one of these:\n"
+            "  1) Run GitHub Actions with HF_TOKEN so ezqrio/indictrans2-320m is uploaded\n"
+            "  2) Kernel → Add Input → dataset ezqrio/indictrans2-320m\n"
+            "  3) Settings → Internet ON, then re-run when Kaggle DNS works\n"
+            f"  Current /kaggle/input: {list(Path('/kaggle/input').iterdir()) if Path('/kaggle/input').exists() else []}"
+        )
+
+    for attempt in range(1, 4):
         try:
-            log(f"Loading model from {model_ref!r} (attempt {attempt}/5)")
+            log(f"Loading from HuggingFace {model_ref!r} (attempt {attempt}/3)")
             tokenizer = AutoTokenizer.from_pretrained(model_ref, trust_remote_code=True)
             model = AutoModelForSeq2SeqLM.from_pretrained(model_ref, trust_remote_code=True)
-            log("Model loaded successfully.")
+            log("Model loaded successfully from HuggingFace.")
             return tokenizer, model
         except Exception as e:
             last_err = e
             log(f"  load failed: {type(e).__name__}: {e}")
-            time.sleep(min(60, 10 * attempt))
+            if attempt < 3:
+                time.sleep(5)
 
     raise RuntimeError(
-        f"Failed to load model {model_ref!r}.\nLast error: {last_err}"
+        f"Failed to load model {model_ref!r}.\nLast error: {last_err}\n"
+        "Prefer attaching local dataset ezqrio/indictrans2-320m."
     ) from last_err
 
 
