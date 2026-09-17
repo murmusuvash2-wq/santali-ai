@@ -58,6 +58,17 @@ jobs:
       - name: Install Kaggle CLI
         run: python -m pip install --upgrade kaggle
 
+      - name: Prepare approved parallel dataset
+        run: python scripts/prepare_mod4_kaggle_dataset.py --output-dir .kaggle-dataset
+
+      - name: Create or update private Kaggle dataset
+        run: |
+          if kaggle datasets status ezqrio/approved-parallel >/dev/null 2>&1; then
+            kaggle datasets version -p .kaggle-dataset -m "Refresh approved Mod4 corpus" -q -t -r skip
+          else
+            kaggle datasets create -p .kaggle-dataset -q -t -r skip
+          fi
+
       - name: Push and run Kaggle kernel
         env:
           ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
