@@ -193,18 +193,4 @@ jobs:
             echo "️ Warning: Could not read kernel ID from metadata."
           fi
 
-      - name: Notify Telegram - training finished
-        if: always()
-        continue-on-error: true
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          JOB_STATUS: ${{ job.status }}
-        run: |
-          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-            curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=✅ Santali AI workflow status: *${JOB_STATUS}*. Kernel: https://www.kaggle.com/code/ezqrio/santali-ai-translation Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              --data-urlencode "parse_mode=Markdown"
-          else
-            echo "⚠️ Telegram alert skipped"
-          fi
+      - name:               --data-urlencode "text=✅ Santali AI workflow status: ${JOB_STATUS}. Kernel: https://www.kaggle.com/code/ezqrio/santali-ai-translation Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
