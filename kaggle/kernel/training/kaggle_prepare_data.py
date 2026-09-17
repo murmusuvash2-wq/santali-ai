@@ -1,14 +1,82 @@
 #!/usr/bin/env python3
-"""Prepare approved CSV data for the Kaggle translation run."""
-import argparse, subprocess, sys
+"""Prepare approved CSV data for the Kaggle translation run.
+
+Path-safe version: works both locally and inside the Kaggle kernel payload.
+"""
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
 from pathlib import Path
 
-def main():
-    ap = argparse.ArgumentParser(); ap.add_argument('--input', required=True); ap.add_argument('--output-dir', required=True)
-    args = ap.parse_args(); out = Path(args.output_dir); out.mkdir(parents=True, exist_ok=True)
-    normalized = out / 'parallel_normalized.csv'; validated = out / 'parallel_validated.csv'
-    subprocess.check_call([sys.executable, 'scripts/normalize_olchiki.py', '--input', args.input, '--output', str(normalized)])
-    subprocess.check_call([sys.executable, 'scripts/validate_parallel.py', '--input', str(normalized), '--output', str(validated)])
-    subprocess.check_call([sys.executable, 'scripts/split_parallel.py', '--input', str(validated), '--output-dir', str(out)])
-    print(f'Prepared data in {out}')
-if __name__ == '__main__': main()
+
+def find_scripts_dir() -> Path:
+    """Locate the scripts/ directory reliably."""
+    # 1. Relative to this file (normal case when repo / kernel is laid out correctly)
+    #    kaggle/kernel/training/ -> kaggle/kernel/scripts/
+    candidate = Path(__file__).resolve().parent.parent / "scripts"
+    if candidate.is_dir():
+        return candidate
+
+    # 2. Fallback: current working directory
+    candidate = Path.cwd() / "scripts"
+    if candidate.is_dir():
+        return candidate
+
+    # 3. Another common Kaggle layout
+    candidate = Path("/kaggle/working/scripts")
+    if candidate.is_dir():
+        return candidate
+
+    raise FileNotFoundError(
+        f"Could not find 'scripts/' folder.\n"
+        f"  __file__ parent: {Path(__file__).resolve().parent}\n"
+        f"  cwd: {Path.cwd()}\n"
+        "Expected layout inside the kernel:\n"
+        "  training/kaggle_prepare_data.py\n"
+        "  scripts/normalize_olchiki.py\n"
+        "  scripts/validate_parallel.py\n"
+        "  scripts/split_parallel.py"
+    )
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--input", required=True, help="Input parallel CSV")
+    ap.add_argument("--output-dir", required=True, help="Directory for processed CSVs")
+    args = ap.parse_args()
+
+    out = Path(args.output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    scripts = find_scripts_dir()
+    print(f"Using scripts from: {scripts}")
+
+    normalized = out / "parallel_normalized.csv"
+    validated = out / "parallel_validated.csv"
+
+    subprocess.check_call([
+        sys.executable, str(scripts / "normalize_olchiki.py"),
+        "--input", args.input,
+        "--output", str(normalized),
+    ])
+
+    subprocess.check_call([
+        sys.executable, str(scripts / "validate_parallel.py"),
+        "--input", str(normalized),
+        "--output", str(validated),
+    ])
+
+    subprocess.check_call([
+        sys.executable, str(scripts / "split_parallel.py"),
+        "--input", str(validated),
+        "--output-dir", str(out),
+    ])
+
+    print(f"Prepared data in {out}")
+    print("Created files:", sorted(p.name for p in out.glob("*.csv")))
+
+
+if __name__ == "__main__":
+    main()
