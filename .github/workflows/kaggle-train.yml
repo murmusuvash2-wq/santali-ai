@@ -41,15 +41,16 @@ jobs:
       - name: Debug secrets
         run: |
           if [ -z "$KAGGLE_API_TOKEN" ]; then
-            echo "FATAL: KAGGLE_API_TOKEN secret is empty"
+            echo "❌ FATAL: KAGGLE_API_TOKEN secret is empty"
             exit 1
           fi
-          echo "KAGGLE_API_TOKEN: OK"
+          echo "✅ KAGGLE_API_TOKEN: OK"
+          
           if [ -z "$HF_TOKEN" ]; then
-            echo "FATAL: HF_TOKEN secret is empty. Add a HuggingFace READ token at Settings → Secrets → Actions."
+            echo "❌ FATAL: HF_TOKEN secret is empty. Add a HuggingFace READ token at Settings → Secrets → Actions."
             exit 1
           fi
-          echo "HF_TOKEN: OK (length ${#HF_TOKEN})"
+          echo "✅ HF_TOKEN: OK (length ${#HF_TOKEN})"
 
       - name: Notify Telegram - training started
         continue-on-error: true
@@ -59,9 +60,9 @@ jobs:
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=Santali AI: downloading model + pushing to Kaggle. Track: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
+              --data-urlencode "text=🚀 Santali AI: Downloading model + pushing to Kaggle. Track: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
           else
-            echo "Telegram alert skipped"
+            echo "⚠️ Telegram alert skipped (Token missing)"
           fi
 
       - name: Set up Python
@@ -80,8 +81,10 @@ jobs:
       - name: Create or update private parallel dataset
         run: |
           if kaggle datasets status ezqrio/approved-parallel >/dev/null 2>&1; then
+            echo "Updating existing dataset: ezqrio/approved-parallel"
             kaggle datasets version -p .kaggle-dataset -m "Refresh approved Mod4 corpus" -q -t -r skip
           else
+            echo "Creating new dataset: ezqrio/approved-parallel"
             kaggle datasets create -p .kaggle-dataset -q -t -r skip
           fi
 
@@ -97,15 +100,19 @@ jobs:
           token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
           if not token:
               raise SystemExit("HF_TOKEN is missing")
+          
+          print("Logging into Hugging Face...")
           login(token=token, add_to_git_credential=False)
 
+          print(f"Downloading model: {os.environ['HF_MODEL_ID']}")
           path = snapshot_download(
               repo_id=os.environ["HF_MODEL_ID"],
               local_dir=".kaggle-model",
               token=token,
           )
-          print("Downloaded model to", path)
+          print(f"✅ Downloaded model to: {path}")
           PY
+          
           python - <<'PY'
           import json
           from pathlib import Path
@@ -115,41 +122,50 @@ jobs:
               "licenses": [{"name": "MIT"}],
           }
           Path(".kaggle-model/dataset-metadata.json").write_text(json.dumps(meta, indent=2))
-          print("Wrote dataset-metadata.json")
+          print("✅ Wrote dataset-metadata.json")
           PY
+          
           rm -rf .kaggle-model/.cache .kaggle-model/.gitattributes 2>/dev/null || true
-          echo "Model folder size:"
+          echo "📦 Model folder size:"
           du -sh .kaggle-model
-          ls -la .kaggle-model | head -40
+          ls -la .kaggle-model | head -20
 
       - name: Create or update model dataset on Kaggle
         if: ${{ github.event.inputs.skip_model_upload != 'true' }}
         run: |
           set -e
           if kaggle datasets status "$KAGGLE_MODEL_DATASET" >/dev/null 2>&1; then
-            echo "Updating existing model dataset $KAGGLE_MODEL_DATASET"
+            echo "🔄 Updating existing model dataset: $KAGGLE_MODEL_DATASET"
             kaggle datasets version -p .kaggle-model -m "Refresh IndicTrans2 320M weights" -q -t -r skip
           else
-            echo "Creating model dataset $KAGGLE_MODEL_DATASET"
+            echo "✨ Creating new model dataset: $KAGGLE_MODEL_DATASET"
             kaggle datasets create -p .kaggle-model -q -t -r skip
           fi
-          echo "Model dataset: https://www.kaggle.com/datasets/ezqrio/indictrans2-320m"
+          echo "✅ Model dataset URL: https://www.kaggle.com/datasets/ezqrio/indictrans2-320m"
 
       - name: Ensure kernel metadata attaches model + data
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
+          
           meta_path = Path("kaggle/kernel/kernel-metadata.json")
+          if not meta_path.exists():
+              raise FileNotFoundError("kernel-metadata.json not found in kaggle/kernel/")
+              
           meta = json.loads(meta_path.read_text())
           sources = meta.get("dataset_sources") or []
+          
           for ds in ["ezqrio/approved-parallel", "ezqrio/indictrans2-320m"]:
               if ds not in sources:
                   sources.append(ds)
+                  
           meta["dataset_sources"] = sources
           meta["enable_internet"] = True
           meta["enable_gpu"] = True
+          
           meta_path.write_text(json.dumps(meta, indent=2) + "\n")
+          print("✅ Updated kernel-metadata.json:")
           print(meta_path.read_text())
           PY
 
@@ -157,17 +173,24 @@ jobs:
         env:
           ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
         run: |
-          echo "Pushing kernel to Kaggle..."
+          echo "🚀 Pushing kernel to Kaggle..."
+          - name: Push and run Kaggle kernel
+        env:
+          ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
+        run: |
+          echo "🚀 Pushing kernel to Kaggle..."
           kaggle kernels push -p kaggle/kernel --accelerator "$ACCELERATOR" --timeout 7200
+          echo "✅ Kernel pushed successfully!"
 
       - name: Print Kaggle kernel status
+        continue-on-error: true
         run: |
           KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])" 2>/dev/null || echo "")
           if [ -n "$KERNEL_ID" ]; then
-            echo "Fetching status for kernel: $KERNEL_ID"
-            kaggle kernels status "$KERNEL_ID"
+            echo " Fetching status for kernel: $KERNEL_ID"
+            kaggle kernels status "$KERNEL_ID" || echo "⚠️ Status check failed, but kernel is likely running."
           else
-            echo "Warning: Could not read kernel ID."
+            echo "️ Warning: Could not read kernel ID from metadata."
           fi
 
       - name: Notify Telegram - training finished
@@ -180,7 +203,8 @@ jobs:
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=Santali AI workflow status: ${JOB_STATUS}. Kernel: https://www.kaggle.com/code/ezqrio/santali-ai-translation Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              --data-urlencode "text=✅ Santali AI workflow status: *${JOB_STATUS}*. Kernel: https://www.kaggle.com/code/ezqrio/santali-ai-translation Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+              --data-urlencode "parse_mode=Markdown"
           else
-            echo "Telegram alert skipped"
+            echo "⚠️ Telegram alert skipped"
           fi
