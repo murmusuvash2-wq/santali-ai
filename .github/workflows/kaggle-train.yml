@@ -26,20 +26,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug Kaggle Secret (Yeh step check karega ki secret load hua ya nahi)
-        env:
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-        run: |
-          if [ -z "$KAGGLE_API_TOKEN" ]; then
-            echo "❌ FATAL ERROR: GitHub Actions is passing an EMPTY secret!"
-            echo "👉 Check: Repo Settings > Secrets and variables > Actions"
-            echo "👉 Ensure name is EXACTLY: KAGGLE_API_TOKEN (NO spaces, NO extra characters)"
-            exit 1
-          else
-            echo "✅ SUCCESS: Secret is loaded! Length: ${#KAGGLE_API_TOKEN} characters."
-            echo "👉 First 5 characters of token: ${KAGGLE_API_TOKEN:0:5}*****"
-          fi
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -48,20 +34,58 @@ jobs:
       - name: Install Kaggle CLI
         run: python -m pip install --upgrade kaggle
 
+      - name: Setup Kaggle Authentication
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          if [ -z "$KAGGLE_USERNAME" ] || [ -z "$KAGGLE_KEY" ]; then
+            echo "❌ Missing KAGGLE_USERNAME or KAGGLE_KEY secrets!"
+            exit 1
+          fi
+          mkdir -p ~/.kaggle
+          printf '{"username":"%s","key":"%s"}\n' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
+          chmod 600 ~/.kaggle/kaggle.json
+          echo "✅ Authentication configured successfully"
+
       - name: Push and run Kaggle kernel
         env:
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
           ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
         run: |
           echo "🚀 Pushing kernel to Kaggle..."
           kaggle kernels push -p kaggle/kernel --accelerator "$ACCELERATOR" --timeout 7200
+          echo "✅ Kernel pushed successfully!"
 
-      - name: Print Kaggle kernel status
+      - name: Print Kaggle kernel status (Optional - Won't fail workflow)
+        continue-on-error: true
         run: |
-          KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])" 2>/dev/null || echo "")
+          echo "📊 Attempting to fetch kernel status..."
+          
+          # Check if metadata file exists
+          if [ ! -f "kaggle/kernel/kernel-metadata.json" ]; then
+            echo "⚠️ kernel-metadata.json not found - skipping status check"
+            exit 0
+          fi
+          
+          # Try to extract kernel ID
+          KERNEL_ID=$(python -c "
+          import json
+          try:
+              data = json.load(open('kaggle/kernel/kernel-metadata.json'))
+              # Try different possible field names
+              kernel_id = data.get('id') or data.get('slug') or data.get('ref')
+              if kernel_id:
+                  print(kernel_id)
+              else:
+                  print('')
+          except Exception as e:
+              print('')
+          " 2>/dev/null)
+          
           if [ -n "$KERNEL_ID" ]; then
-            echo "📊 Fetching status for kernel: $KERNEL_ID"
-            kaggle kernels status "$KERNEL_ID"
+            echo "Fetching status for: $KERNEL_ID"
+            kaggle kernels status "$KERNEL_ID" || echo "⚠️ Could not fetch status (but kernel was pushed successfully)"
           else
-            echo "⚠️ Warning: Could not read kernel ID."
+            echo "ℹ️ Kernel ID not found in metadata - but kernel was pushed successfully!"
+            echo "👉 Check your Kaggle profile to see the running kernel"
           fi
