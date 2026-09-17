@@ -7,13 +7,13 @@ NOT available at runtime. Everything needed is inlined here.
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import os
 import random
 import re
 import subprocess
 import sys
+import time
 import unicodedata
 from pathlib import Path
 
@@ -32,6 +32,20 @@ TGT_LANG = "sat_Olck"
 OL_CHIKI = re.compile(r"[\u1C50-\u1C7F]")
 EPOCHS = float(os.environ.get("EPOCHS", "3"))
 
+# Critical for training; optional packages are best-effort only.
+CRITICAL_PKGS = [
+    "transformers",
+    "datasets",
+    "accelerate",
+    "peft",
+    "sentencepiece",
+    "pandas",
+]
+OPTIONAL_PKGS = [
+    "sacrebleu",
+    "evaluate",
+]
+
 
 def log(msg: str) -> None:
     print(msg, flush=True)
@@ -45,7 +59,7 @@ def debug_layout() -> None:
     for root in [Path.cwd(), Path("/kaggle/src"), Path("/kaggle/working"), Path("/kaggle/input")]:
         if root.exists():
             files = sorted(p for p in root.rglob("*") if p.is_file())[:40]
-            log(f"{root} ({len(list(root.rglob('*')))} entries):")
+            log(f"{root}:")
             for p in files:
                 try:
                     log(f"  {p}")
@@ -54,25 +68,93 @@ def debug_layout() -> None:
     log("=" * 60)
 
 
+def _import_ok(mod: str) -> bool:
+    try:
+        __import__(mod)
+        return True
+    except Exception:
+        return False
+
+
+def _pip_install(spec: str, retries: int = 3) -> bool:
+    """Install one package; return True on success."""
+    for attempt in range(1, retries + 1):
+        try:
+            log(f"  pip install {spec} (attempt {attempt}/{retries})")
+            subprocess.check_call(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "-q",
+                    "--disable-pip-version-check",
+                    "--no-input",
+                    spec,
+                ],
+                timeout=300,
+            )
+            return True
+        except Exception as e:
+            log(f"  pip failed for {spec}: {e}")
+            if attempt < retries:
+                wait = 10 * attempt
+                log(f"  retrying in {wait}s...")
+                time.sleep(wait)
+    return False
+
+
 def install_deps() -> None:
-    pkgs = [
-        "transformers>=4.40",
-        "datasets>=2.18",
-        "accelerate>=0.28",
-        "peft>=0.10",
-        "sentencepiece>=0.2",
-        "pandas>=2.0",
-        "sacrebleu>=2.4",
-        "evaluate>=0.4",
-    ]
-    log("Installing training dependencies...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-q", *pkgs],
-    )
+    """Prefer Kaggle preinstalled packages; only pip what is missing.
+
+    Network on Kaggle can flake (DNS Temporary failure). Never block
+    training on optional packages like sacrebleu/evaluate.
+    """
+    log("Checking training dependencies...")
+
+    # Map pip name -> import name when different
+    import_name = {
+        "sentencepiece": "sentencepiece",
+        "transformers": "transformers",
+        "datasets": "datasets",
+        "accelerate": "accelerate",
+        "peft": "peft",
+        "pandas": "pandas",
+        "sacrebleu": "sacrebleu",
+        "evaluate": "evaluate",
+    }
+
+    missing_critical = []
+    for pkg in CRITICAL_PKGS:
+        mod = import_name.get(pkg, pkg)
+        if _import_ok(mod):
+            log(f"  OK preinstalled: {pkg}")
+        else:
+            log(f"  missing: {pkg}")
+            missing_critical.append(pkg)
+
+    for pkg in missing_critical:
+        ok = _pip_install(pkg)
+        if not ok or not _import_ok(import_name.get(pkg, pkg)):
+            raise RuntimeError(
+                f"Critical package '{pkg}' is not available and pip install failed.\n"
+                "Ensure the kernel has Internet enabled (enable_internet: true) "
+                "and re-run. Kaggle DNS sometimes fails transiently."
+            )
+
+    for pkg in OPTIONAL_PKGS:
+        mod = import_name.get(pkg, pkg)
+        if _import_ok(mod):
+            log(f"  OK optional: {pkg}")
+            continue
+        if not _pip_install(pkg, retries=2):
+            log(f"  skipping optional {pkg} (not required for LoRA train)")
+
+    log("Dependency check done.")
 
 
 # ---------------------------------------------------------------------------
-# Data prep (inlined from scripts/)
+# Data prep (inlined)
 # ---------------------------------------------------------------------------
 def normalize_rows(rows: list[dict]) -> list[dict]:
     for r in rows:
@@ -97,7 +179,6 @@ def validate_rows(rows: list[dict]) -> list[dict]:
             stats["duplicates"] += 1
             continue
         seen.add(key)
-        # If target looks like Ol Chiki language, require at least one Ol Chiki char
         tlang = r.get("target_lang", "sat_Olck")
         if tlang == "sat_Olck" and not OL_CHIKI.search(target):
             stats["no_olchiki"] += 1
@@ -132,7 +213,6 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 def prepare_data() -> Path:
     csv_path = Path(INPUT_CSV)
     if not csv_path.exists():
-        # try common alternate locations
         alts = list(Path("/kaggle/input").rglob("parallel.csv"))
         if alts:
             csv_path = alts[0]
@@ -149,7 +229,6 @@ def prepare_data() -> Path:
         rows = list(csv.DictReader(f))
     log(f"Raw rows: {len(rows)}")
 
-    # Map common column names to source/target
     if rows and ("source" not in rows[0] or "target" not in rows[0]):
         for r in rows:
             if "src" in r and "source" not in r:
@@ -201,7 +280,7 @@ def train_lora(data_dir: Path) -> None:
             raise FileNotFoundError(f"Missing {p}")
 
     ds = DatasetDict({s: load_csv(data_dir / f"{s}.csv") for s in ("train", "validation", "test")})
-    log(f"Dataset sizes: {{k: len(v) for k, v in ds.items()}}")
+    log(f"Dataset sizes: { {k: len(v) for k, v in ds.items()} }")
 
     log(f"Loading model {MODEL_ID}")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
