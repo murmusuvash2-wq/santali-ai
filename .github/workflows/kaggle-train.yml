@@ -26,6 +26,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug Kaggle Secret (Yeh step check karega ki secret load hua ya nahi)
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          if [ -z "$KAGGLE_API_TOKEN" ]; then
+            echo "❌ FATAL ERROR: GitHub Actions is passing an EMPTY secret!"
+            echo "👉 Check: Repo Settings > Secrets and variables > Actions"
+            echo "👉 Ensure name is EXACTLY: KAGGLE_API_TOKEN (NO spaces, NO extra characters)"
+            exit 1
+          else
+            echo "✅ SUCCESS: Secret is loaded! Length: ${#KAGGLE_API_TOKEN} characters."
+            echo "👉 First 5 characters of token: ${KAGGLE_API_TOKEN:0:5}*****"
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -39,24 +53,15 @@ jobs:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
           ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
         run: |
-          # 1. Check if token is present
-          if [ -z "$KAGGLE_API_TOKEN" ]; then
-            echo "❌ Error: KAGGLE_API_TOKEN secret is missing!"
-            exit 1
-          fi
-          
-          # 2. Push the kernel (Kaggle CLI automatically reads KAGGLE_API_TOKEN from env)
           echo "🚀 Pushing kernel to Kaggle..."
           kaggle kernels push -p kaggle/kernel --accelerator "$ACCELERATOR" --timeout 7200
 
       - name: Print Kaggle kernel status
         run: |
-          # Safely extract kernel ID to avoid crashes if file is missing/malformed
           KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])" 2>/dev/null || echo "")
-          
           if [ -n "$KERNEL_ID" ]; then
             echo "📊 Fetching status for kernel: $KERNEL_ID"
             kaggle kernels status "$KERNEL_ID"
           else
-            echo "⚠️ Warning: Could not read kernel ID from kaggle/kernel/kernel-metadata.json"
+            echo "⚠️ Warning: Could not read kernel ID."
           fi
