@@ -29,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_MODEL_ID: ai4bharat/indictrans2-indic-indic-dist-320M
       KAGGLE_MODEL_DATASET: ezqrio/indictrans2-320m
 
@@ -36,14 +38,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug Kaggle Secret
+      - name: Debug secrets
         run: |
           if [ -z "$KAGGLE_API_TOKEN" ]; then
-            echo "FATAL ERROR: GitHub Actions is passing an EMPTY secret. Check the exact name KAGGLE_API_TOKEN."
+            echo "FATAL: KAGGLE_API_TOKEN secret is empty"
             exit 1
-          else
-            echo "SUCCESS: Kaggle secret is loaded."
           fi
+          echo "KAGGLE_API_TOKEN: OK"
+          if [ -z "$HF_TOKEN" ]; then
+            echo "FATAL: HF_TOKEN secret is empty. Add a HuggingFace READ token at Settings → Secrets → Actions."
+            exit 1
+          fi
+          echo "HF_TOKEN: OK (length ${#HF_TOKEN})"
 
       - name: Notify Telegram - training started
         continue-on-error: true
@@ -53,9 +59,9 @@ jobs:
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=Santali AI training started. Model + data will be pushed to Kaggle. Track: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
+              --data-urlencode "text=Santali AI: downloading model + pushing to Kaggle. Track: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
           else
-            echo "Telegram alert skipped: TELEGRAM_BOT_TOKEN secret is not configured."
+            echo "Telegram alert skipped"
           fi
 
       - name: Set up Python
@@ -66,7 +72,7 @@ jobs:
       - name: Install CLI tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --upgrade kaggle huggingface_hub
+          python -m pip install --upgrade kaggle "huggingface_hub[cli]"
 
       - name: Prepare approved parallel dataset
         run: python scripts/prepare_mod4_kaggle_dataset.py --output-dir .kaggle-dataset
@@ -79,34 +85,42 @@ jobs:
             kaggle datasets create -p .kaggle-dataset -q -t -r skip
           fi
 
-      - name: Download IndicTrans2 model (GitHub Actions has internet)
+      - name: Download IndicTrans2 model with HF_TOKEN
         if: ${{ github.event.inputs.skip_model_upload != 'true' }}
         run: |
           set -e
           mkdir -p .kaggle-model
           python - <<'PY'
-          from huggingface_hub import snapshot_download
           import os
+          from huggingface_hub import login, snapshot_download
+
+          token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+          if not token:
+              raise SystemExit("HF_TOKEN is missing")
+          login(token=token, add_to_git_credential=False)
+
           path = snapshot_download(
               repo_id=os.environ["HF_MODEL_ID"],
               local_dir=".kaggle-model",
-              local_dir_use_symlinks=False,
+              token=token,
           )
           print("Downloaded model to", path)
           PY
-          # Kaggle dataset metadata
-          cat > .kaggle-model/dataset-metadata.json <<'EOF'
-          {
-            "title": "IndicTrans2 320M (Indic-Indic dist)",
-            "id": "ezqrio/indictrans2-320m",
-            "licenses": [{"name": "MIT"}]
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          meta = {
+              "title": "IndicTrans2 320M (Indic-Indic dist)",
+              "id": "ezqrio/indictrans2-320m",
+              "licenses": [{"name": "MIT"}],
           }
-          EOF
-          # Remove git / cache junk if any
-          rm -rf .kaggle-model/.cache .kaggle-model/.gitattributes || true
+          Path(".kaggle-model/dataset-metadata.json").write_text(json.dumps(meta, indent=2))
+          print("Wrote dataset-metadata.json")
+          PY
+          rm -rf .kaggle-model/.cache .kaggle-model/.gitattributes 2>/dev/null || true
           echo "Model folder size:"
           du -sh .kaggle-model
-          ls -la .kaggle-model | head -30
+          ls -la .kaggle-model | head -40
 
       - name: Create or update model dataset on Kaggle
         if: ${{ github.event.inputs.skip_model_upload != 'true' }}
@@ -119,7 +133,7 @@ jobs:
             echo "Creating model dataset $KAGGLE_MODEL_DATASET"
             kaggle datasets create -p .kaggle-model -q -t -r skip
           fi
-          echo "Model dataset ready: https://www.kaggle.com/datasets/ezqrio/indictrans2-320m"
+          echo "Model dataset: https://www.kaggle.com/datasets/ezqrio/indictrans2-320m"
 
       - name: Ensure kernel metadata attaches model + data
         run: |
@@ -166,7 +180,7 @@ jobs:
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
             curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=Santali AI training workflow finished with status: ${JOB_STATUS}. Kaggle kernel: https://www.kaggle.com/code/ezqrio/santali-ai-translation. Open GitHub run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+              --data-urlencode "text=Santali AI workflow status: ${JOB_STATUS}. Kernel: https://www.kaggle.com/code/ezqrio/santali-ai-translation Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           else
-            echo "Telegram alert skipped: TELEGRAM_BOT_TOKEN secret is not configured."
+            echo "Telegram alert skipped"
           fi
