@@ -1,8 +1,10 @@
 """Kaggle entrypoint — fully self-contained.
 
-Kaggle script kernels execute only the code_file (this file) from
-/kaggle/src/script.py. Supporting files in training/ or scripts/ are
-NOT available at runtime. Everything needed is inlined here.
+Load order for the base model:
+  1. MODEL_PATH env (explicit local folder)
+  2. Known Kaggle input dataset folders
+  3. Any /kaggle/input/**/config.json that has model weights
+  4. HuggingFace hub (needs working Internet)
 """
 from __future__ import annotations
 
@@ -18,16 +20,13 @@ import time
 import unicodedata
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Paths / constants
-# ---------------------------------------------------------------------------
 INPUT_CSV = os.environ.get(
     "INPUT_CSV", "/kaggle/input/approved-parallel/parallel.csv"
 )
 OUT = Path("/kaggle/working/santali-output")
 DATA_DIR = OUT / "data"
 ADAPTER_DIR = OUT / "adapter"
-MODEL_ID = os.environ.get(
+HF_MODEL_ID = os.environ.get(
     "MODEL_ID", "ai4bharat/indictrans2-indic-indic-dist-320M"
 )
 SRC_LANG = "hin_Deva"
@@ -44,6 +43,15 @@ CRITICAL_PKGS = [
     "pandas",
 ]
 
+# Prefer these local folders if the user attaches a model dataset on Kaggle.
+LOCAL_MODEL_CANDIDATES = [
+    os.environ.get("MODEL_PATH", "").strip(),
+    "/kaggle/input/indictrans2-320m",
+    "/kaggle/input/indictrans2-indic-indic-dist-320m",
+    "/kaggle/input/ai4bharat-indictrans2-320m",
+    "/kaggle/input/indictrans2",
+]
+
 
 def log(msg: str) -> None:
     print(msg, flush=True)
@@ -54,15 +62,12 @@ def debug_layout() -> None:
     log("Kaggle kernel starting (self-contained)")
     log(f"cwd      : {Path.cwd()}")
     log(f"__file__  : {globals().get('__file__', 'N/A')}")
-    for root in [Path.cwd(), Path("/kaggle/src"), Path("/kaggle/working"), Path("/kaggle/input")]:
+    for root in [Path("/kaggle/src"), Path("/kaggle/working"), Path("/kaggle/input")]:
         if root.exists():
-            files = sorted(p for p in root.rglob("*") if p.is_file())[:40]
             log(f"{root}:")
-            for p in files:
-                try:
+            for p in sorted(root.rglob("*"))[:50]:
+                if p.is_file():
                     log(f"  {p}")
-                except Exception:
-                    pass
     log("=" * 60)
 
 
@@ -80,14 +85,8 @@ def _pip_install(spec: str, retries: int = 2) -> bool:
             log(f"  pip install {spec} (attempt {attempt}/{retries})")
             subprocess.check_call(
                 [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "-q",
-                    "--disable-pip-version-check",
-                    "--no-input",
-                    spec,
+                    sys.executable, "-m", "pip", "install", "-q",
+                    "--disable-pip-version-check", "--no-input", spec,
                 ],
                 timeout=180,
             )
@@ -100,72 +99,85 @@ def _pip_install(spec: str, retries: int = 2) -> bool:
 
 
 def install_deps() -> None:
-    """Prefer Kaggle preinstalled packages. Never install optional metrics pkgs."""
     log("Checking training dependencies...")
-    import_name = {
-        "sentencepiece": "sentencepiece",
-        "transformers": "transformers",
-        "datasets": "datasets",
-        "accelerate": "accelerate",
-        "peft": "peft",
-        "pandas": "pandas",
-    }
     missing = []
     for pkg in CRITICAL_PKGS:
-        mod = import_name.get(pkg, pkg)
-        if _import_ok(mod):
+        if _import_ok(pkg):
             log(f"  OK preinstalled: {pkg}")
         else:
             log(f"  missing: {pkg}")
             missing.append(pkg)
-
     for pkg in missing:
-        ok = _pip_install(pkg)
-        if not ok or not _import_ok(import_name.get(pkg, pkg)):
+        if not _pip_install(pkg) or not _import_ok(pkg):
             raise RuntimeError(
-                f"Critical package '{pkg}' missing and pip install failed.\n"
-                "Kernel needs working Internet (enable_internet: true). "
-                "Kaggle DNS can fail transiently — re-run the kernel."
+                f"Critical package '{pkg}' missing and pip failed. "
+                "Turn Internet ON and re-run, or wait for Kaggle DNS."
             )
-    log("Dependency check done (optional metrics packages skipped).")
+    log("Dependency check done (no optional pip installs).")
+
+
+def _looks_like_model_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    if not (path / "config.json").exists():
+        return False
+    has_weights = (
+        (path / "pytorch_model.bin").exists()
+        or (path / "model.safetensors").exists()
+        or any(path.glob("*.safetensors"))
+        or any(path.glob("pytorch_model*.bin"))
+    )
+    return has_weights
+
+
+def resolve_model_source() -> str:
+    """Local Kaggle input first, else HuggingFace id."""
+    # 1) Explicit candidates
+    for raw in LOCAL_MODEL_CANDIDATES:
+        if not raw:
+            continue
+        p = Path(raw)
+        if _looks_like_model_dir(p):
+            log(f"Using LOCAL model: {p}")
+            return str(p)
+        # sometimes weights sit one level deeper
+        if p.is_dir():
+            for sub in p.iterdir():
+                if _looks_like_model_dir(sub):
+                    log(f"Using LOCAL model: {sub}")
+                    return str(sub)
+
+    # 2) Auto-scan all attached inputs
+    input_root = Path("/kaggle/input")
+    if input_root.exists():
+        for cfg in input_root.rglob("config.json"):
+            parent = cfg.parent
+            if _looks_like_model_dir(parent):
+                log(f"Using LOCAL model (auto): {parent}")
+                return str(parent)
+
+    # 3) HuggingFace
+    log(f"No local model found under /kaggle/input — will load from HuggingFace: {HF_MODEL_ID}")
+    log("Tip: upload model as Kaggle dataset (e.g. ezqrio/indictrans2-320m) to skip HF download.")
+    return HF_MODEL_ID
 
 
 def network_ok(host: str = "huggingface.co", port: int = 443, timeout: float = 5.0) -> bool:
     try:
-        socket.setdefaulttimeout(timeout)
         with socket.create_connection((host, port), timeout=timeout):
             return True
     except OSError as e:
-        log(f"Network probe to {host}:{port} failed: {e}")
+        log(f"Network probe {host}:{port} failed: {e}")
         return False
-
-
-def resolve_model_path() -> str:
-    """Prefer a local Kaggle input copy of the model so HF download is not required."""
-    env = os.environ.get("MODEL_PATH", "").strip()
-    if env and Path(env).exists():
-        log(f"Using MODEL_PATH={env}")
-        return env
-
-    # Any attached dataset that already has config.json (model weights)
-    for cfg in Path("/kaggle/input").rglob("config.json"):
-        parent = cfg.parent
-        # skip tiny / non-model dirs
-        if (parent / "pytorch_model.bin").exists() or list(parent.glob("*.safetensors")):
-            log(f"Found local model at {parent}")
-            return str(parent)
-
-    return MODEL_ID
 
 
 def load_tokenizer_and_model(model_ref: str):
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-    last_err: Exception | None = None
     is_local = Path(model_ref).exists()
+    last_err: Exception | None = None
 
     if not is_local:
-        # Warm up / wait for DNS — Kaggle often flakes for a few minutes
         for probe in range(1, 6):
             if network_ok():
                 log(f"Network OK (probe {probe})")
@@ -175,22 +187,20 @@ def load_tokenizer_and_model(model_ref: str):
             time.sleep(wait)
         else:
             raise RuntimeError(
-                "Cannot reach huggingface.co (DNS/network failure).\n"
-                "Options:\n"
-                "  1. Re-run this kernel (transient Kaggle DNS issue)\n"
-                "  2. Attach model weights as a Kaggle dataset and set MODEL_PATH\n"
-                "  3. Confirm Settings → Internet is ON for this notebook/kernel"
+                "Cannot reach huggingface.co and no local model attached.\n"
+                "Fix options:\n"
+                "  A) Re-run kernel (Kaggle DNS often recovers)\n"
+                "  B) Upload IndicTrans2 weights as a Kaggle dataset and Add Input\n"
+                "     Suggested folder names: indictrans2-320m / indictrans2\n"
+                "  C) Settings → Internet = ON"
             )
 
     for attempt in range(1, 6):
         try:
-            log(f"Loading model from {model_ref} (attempt {attempt}/5)")
-            tokenizer = AutoTokenizer.from_pretrained(
-                model_ref, trust_remote_code=True
-            )
-            model = AutoModelForSeq2SeqLM.from_pretrained(
-                model_ref, trust_remote_code=True
-            )
+            log(f"Loading model from {model_ref!r} (attempt {attempt}/5)")
+            tokenizer = AutoTokenizer.from_pretrained(model_ref, trust_remote_code=True)
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_ref, trust_remote_code=True)
+            log("Model loaded successfully.")
             return tokenizer, model
         except Exception as e:
             last_err = e
@@ -198,9 +208,7 @@ def load_tokenizer_and_model(model_ref: str):
             time.sleep(min(60, 10 * attempt))
 
     raise RuntimeError(
-        f"Failed to load model {model_ref} after retries.\n"
-        f"Last error: {last_err}\n"
-        "If this is a network error, re-run or attach the model as a Kaggle dataset."
+        f"Failed to load model {model_ref!r}.\nLast error: {last_err}"
     ) from last_err
 
 
@@ -271,7 +279,6 @@ def prepare_data() -> Path:
         else:
             raise FileNotFoundError(
                 f"Input CSV not found: {INPUT_CSV}\n"
-                f"/kaggle/input: {list(Path('/kaggle/input').rglob('*'))[:30]}\n"
                 "Attach dataset ezqrio/approved-parallel."
             )
 
@@ -327,7 +334,7 @@ def train_lora(data_dir: Path) -> None:
     ds = DatasetDict({s: load_csv(data_dir / f"{s}.csv") for s in ("train", "validation", "test")})
     log(f"Dataset sizes: { {k: len(v) for k, v in ds.items()} }")
 
-    model_ref = resolve_model_path()
+    model_ref = resolve_model_source()
     tokenizer, model = load_tokenizer_and_model(model_ref)
 
     peft_config = LoraConfig(
