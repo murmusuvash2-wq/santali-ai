@@ -22,9 +22,6 @@ permissions:
 jobs:
   push-and-run-kaggle:
     runs-on: ubuntu-latest
-    # Required repository secret: KAGGLE_API_TOKEN
-    # Value = new-style access token from https://www.kaggle.com/settings/api
-    # (starts with KGAT_...)
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,44 +34,29 @@ jobs:
       - name: Install Kaggle CLI
         run: python -m pip install --upgrade kaggle
 
-      - name: Configure Kaggle authentication
+      - name: Push and run Kaggle kernel
         env:
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
-        run: |
-          test -n "$KAGGLE_API_TOKEN" || { echo 'Missing KAGGLE_API_TOKEN secret' && exit 1; }
-          mkdir -p ~/.kaggle
-          printf '%s\n' "$KAGGLE_API_TOKEN" > ~/.kaggle/access_token
-          chmod 600 ~/.kaggle/access_token
-          echo "access_token written: $(test -f ~/.kaggle/access_token && echo YES)"
-
-      - name: Push and run Kaggle kernel
-        env:
           ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
         run: |
+          # 1. Check if token is present
+          if [ -z "$KAGGLE_API_TOKEN" ]; then
+            echo "❌ Error: KAGGLE_API_TOKEN secret is missing!"
+            exit 1
+          fi
+          
+          # 2. Push the kernel (Kaggle CLI automatically reads KAGGLE_API_TOKEN from env)
+          echo "🚀 Pushing kernel to Kaggle..."
           kaggle kernels push -p kaggle/kernel --accelerator "$ACCELERATOR" --timeout 7200
 
       - name: Print Kaggle kernel status
-        run: kaggle kernels status "$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])")"
-      - name: Install Kaggle CLI
-        run: python -m pip install --upgrade kaggle
-
-      - name: Configure Kaggle authentication
-        env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
         run: |
-          test -n "$KAGGLE_USERNAME" || { echo 'Missing KAGGLE_USERNAME secret' && exit 1; }
-          test -n "$KAGGLE_KEY" || { echo 'Missing KAGGLE_KEY secret' && exit 1; }
-          mkdir -p ~/.kaggle
-          printf '{"username":"%s","key":"%s"}\n' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
-          chmod 600 ~/.kaggle/kaggle.json
-          echo "kaggle.json written: $(test -f ~/.kaggle/kaggle.json && echo YES)"
-
-      - name: Push and run Kaggle kernel
-        env:
-          ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
-        run: |
-          kaggle kernels push -p kaggle/kernel --accelerator "$ACCELERATOR" --timeout 7200
-
-      - name: Print Kaggle kernel status
-        run: kaggle kernels status "$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])")"
+          # Safely extract kernel ID to avoid crashes if file is missing/malformed
+          KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])" 2>/dev/null || echo "")
+          
+          if [ -n "$KERNEL_ID" ]; then
+            echo "📊 Fetching status for kernel: $KERNEL_ID"
+            kaggle kernels status "$KERNEL_ID"
+          else
+            echo "⚠️ Warning: Could not read kernel ID from kaggle/kernel/kernel-metadata.json"
+          fi
