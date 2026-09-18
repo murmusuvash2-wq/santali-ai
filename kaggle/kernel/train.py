@@ -221,6 +221,18 @@ def patch_local_model_for_transformers(model_ref: str) -> str:
     return str(patched)
 
 
+def disable_incompatible_torchao() -> None:
+    """Use ordinary LoRA when Kaggle ships an unsupported torchao build."""
+    try:
+        import peft.import_utils as import_utils
+        import_utils.is_torchao_available = lambda: False
+        import peft.tuners.lora.torchao as torchao_dispatcher
+        torchao_dispatcher.is_torchao_available = lambda: False
+        log("  disabled incompatible torchao dispatcher; using standard LoRA")
+    except Exception as error:
+        log(f"  torchao compatibility probe skipped: {error}")
+
+
 def load_tokenizer_and_model(model_ref: str):
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -372,6 +384,7 @@ def train_lora(data_dir: Path) -> None:
     from datasets import Dataset, DatasetDict
     from transformers import DataCollatorForSeq2Seq, Seq2SeqTrainer, Seq2SeqTrainingArguments
     from peft import LoraConfig, TaskType, get_peft_model
+    disable_incompatible_torchao()
 
     def load_csv(path: Path) -> Dataset:
         df = pd.read_csv(path).fillna("")
