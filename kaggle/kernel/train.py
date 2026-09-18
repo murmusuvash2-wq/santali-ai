@@ -199,6 +199,28 @@ def network_ok(host: str = "huggingface.co", port: int = 443, timeout: float = 3
         return False
 
 
+def patch_local_model_for_transformers(model_ref: str) -> str:
+    """Use symlinked weights with a tiny source-only compatibility patch."""
+    import shutil
+    patched = Path("/kaggle/working/indictrans2-320m-patched")
+    if patched.exists():
+        return str(patched)
+    shutil.copytree(model_ref, patched, symlinks=True)
+    modeling = patched / "modeling_indictrans.py"
+    if modeling.exists():
+        source = modeling.read_text(encoding="utf-8")
+        updated = re.sub(
+            r"def tie_weights\(self(?:, [^)]*)?\):",
+            "def tie_weights(self, *args, **kwargs):",
+            source,
+            count=1,
+        )
+        if updated != source:
+            modeling.write_text(updated, encoding="utf-8")
+            log("  patched IndicTrans2 tie_weights signature for local loader")
+    return str(patched)
+
+
 def load_tokenizer_and_model(model_ref: str):
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -207,8 +229,9 @@ def load_tokenizer_and_model(model_ref: str):
 
     if is_local:
         log(f"Loading LOCAL model (no network wait): {model_ref}")
-        tokenizer = AutoTokenizer.from_pretrained(model_ref, trust_remote_code=True, local_files_only=True)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_ref, trust_remote_code=True, local_files_only=True)
+        compatible_ref = patch_local_model_for_transformers(model_ref)
+        tokenizer = AutoTokenizer.from_pretrained(compatible_ref, trust_remote_code=True, local_files_only=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(compatible_ref, trust_remote_code=True, local_files_only=True)
         log("Model loaded successfully from local disk.")
         return tokenizer, model
 
