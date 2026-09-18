@@ -1,4 +1,4 @@
-.PHONY: check diagram audit-corpus profile-parallel import-mmloso evaluate-predictions
+.PHONY: check diagram audit-corpus profile-parallel import-mmloso build-seed-corpus evaluate-predictions
 check:
 	python -m compileall scripts training src
 
@@ -15,6 +15,10 @@ profile-parallel:
 import-mmloso:
 	@test -n "$(INPUT)" -a -n "$(SHA256)" -a -n "$(OUTPUT)"
 	python scripts/import_mmloso.py --input "$(INPUT)" --source-sha256 "$(SHA256)" --output "$(OUTPUT)"
+
+build-seed-corpus:
+	@test -n "$(INPUT)" -a -n "$(OUTPUT_DIR)" -a -n "$(MANIFEST)"
+	python scripts/build_seed_corpus.py --input "$(INPUT)" --output-dir "$(OUTPUT_DIR)" --manifest "$(MANIFEST)"
 
 evaluate-predictions:
 	@test -n "$(REFERENCES)" -a -n "$(PREDICTIONS)" -a -n "$(TRACK)" -a -n "$(OUTPUT)"
