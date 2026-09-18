@@ -42,7 +42,6 @@ CRITICAL_PKGS = [
     "sentencepiece",
     "pandas",
 ]
-TRANSFORMERS_VERSION = "4.46.3"
 
 LOCAL_MODEL_CANDIDATES = [
     os.environ.get("MODEL_PATH", "").strip(),
@@ -98,13 +97,29 @@ def _pip_install(spec: str, retries: int = 2) -> bool:
     return False
 
 
+def install_transformers_compat() -> None:
+    """Keep IndicTrans2 loadable on Kaggle images without network access."""
+    import types
+    try:
+        import transformers
+        import transformers.onnx  # type: ignore[attr-defined]
+        log("  transformers.onnx is available")
+        return
+    except Exception as error:
+        log(f"  transformers.onnx unavailable; installing local shim: {error}")
+    module = types.ModuleType("transformers.onnx")
+    class OnnxConfig:
+        pass
+    class OnnxSeq2SeqConfigWithPast(OnnxConfig):
+        pass
+    module.OnnxConfig = OnnxConfig
+    module.OnnxSeq2SeqConfigWithPast = OnnxSeq2SeqConfigWithPast
+    sys.modules["transformers.onnx"] = module
+    log("  local transformers.onnx shim installed")
+
+
 def install_deps() -> None:
     log("Checking training dependencies...")
-    # IndicTrans2 remote code imports transformers.onnx, which is missing from
-    # newer Transformers builds preinstalled on some Kaggle images.
-    log(f"  enforcing transformers=={TRANSFORMERS_VERSION} for IndicTrans2 compatibility")
-    if not _pip_install(f"transformers=={TRANSFORMERS_VERSION}"):
-        raise RuntimeError("Could not install the Transformers version required by IndicTrans2.")
     missing = []
     for pkg in CRITICAL_PKGS:
         if _import_ok(pkg):
@@ -118,6 +133,7 @@ def install_deps() -> None:
                 f"Critical package '{pkg}' missing and pip failed. "
                 "Turn Internet ON and re-run, or wait for Kaggle DNS."
             )
+    install_transformers_compat()
     log("Dependency check done (no optional pip installs).")
 
 
