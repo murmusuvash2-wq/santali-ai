@@ -108,13 +108,24 @@ def install_transformers_compat() -> None:
     except Exception as error:
         log(f"  transformers.onnx unavailable; installing local shim: {error}")
     module = types.ModuleType("transformers.onnx")
+    module.__path__ = []
     class OnnxConfig:
-        pass
+        default_fixed_batch = 2
+        default_fixed_sequence = 8
     class OnnxSeq2SeqConfigWithPast(OnnxConfig):
-        pass
+        use_past = False
+        def fill_with_past_key_values_(self, inputs, direction="inputs"):
+            return inputs
     module.OnnxConfig = OnnxConfig
     module.OnnxSeq2SeqConfigWithPast = OnnxSeq2SeqConfigWithPast
     sys.modules["transformers.onnx"] = module
+    utils = types.ModuleType("transformers.onnx.utils")
+    def compute_effective_axis_dimension(dimension, fixed_dimension, num_token_to_add=0):
+        if dimension is None or dimension < 0:
+            return fixed_dimension + num_token_to_add
+        return dimension + num_token_to_add
+    utils.compute_effective_axis_dimension = compute_effective_axis_dimension
+    sys.modules["transformers.onnx.utils"] = utils
     log("  local transformers.onnx shim installed")
 
 
