@@ -174,7 +174,7 @@ jobs:
             if [ "$PARALLEL_TRAINING_READY" != "true" ]; then
               JOB_STATUS="blocked-safely-no-approved-parallel-data"
             fi
-            curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
               --data-urlencode "text=Santali AI GitHub workflow finished: ${JOB_STATUS}. Kaggle: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
           fi

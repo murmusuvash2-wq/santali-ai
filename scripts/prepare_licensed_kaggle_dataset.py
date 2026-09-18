@@ -111,6 +111,8 @@ def main() -> None:
         writer.writerows(rows)
     metadata = {
         "title": "Santali AI Licensed Parallel Corpus",
+        "id": "ezqrio/approved-parallel",
+        "licenses": [{"name": "CC-BY-SA-4.0"}],
         "description": "Only explicitly approved, hashed parallel sources are included.",
         "rows": len(rows),
         "sources": used_sources,
