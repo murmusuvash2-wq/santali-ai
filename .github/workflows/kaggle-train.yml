@@ -79,18 +79,28 @@ jobs:
               and source['kind'] == 'parallel_text'
           ]
           print(f"Approved parallel source count: {len(approved_parallel)}")
-          if not approved_parallel:
-              raise SystemExit(
-                  "No parallel_text source is approved for Kaggle training. "
-                  "Verify license, training permission, redistribution permission, "
-                  "artifact hash, and attribution before adding a source."
-              )
+          Path('.github-training-ready').write_text('true\n' if approved_parallel else 'false\n')
           PY
+          if grep -qx true .github-training-ready; then
+            echo "PARALLEL_TRAINING_READY=true" >> "$GITHUB_ENV"
+            echo "Licensed parallel source is ready."
+          else
+            echo "PARALLEL_TRAINING_READY=false" >> "$GITHUB_ENV"
+            echo "Training safely skipped: no approved parallel_text source is ready."
+            {
+              echo '## Training skipped safely'
+              echo
+              echo 'No approved parallel_text source currently has verified license, training permission, redistribution permission, attribution, and SHA-256 metadata.'
+              echo 'The workflow completed without uploading data or starting Kaggle training.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Prepare approved parallel dataset
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         run: python scripts/prepare_licensed_kaggle_dataset.py --output-dir .kaggle-dataset
 
       - name: Create or update private parallel dataset
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         run: |
           if kaggle datasets status ezqrio/approved-parallel >/dev/null 2>&1; then
             kaggle datasets version -p .kaggle-dataset -m "Refresh approved Mod4 corpus" -q -t -r skip
@@ -99,7 +109,7 @@ jobs:
           fi
 
       - name: Download IndicTrans2 model
-        if: ${{ github.event.inputs.skip_model_upload != 'true' }}
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' && github.event.inputs.skip_model_upload != 'true' }}
         run: |
           python - <<'PY'
           import json, os
@@ -118,7 +128,7 @@ jobs:
           rm -rf .kaggle-model/.cache .kaggle-model/.gitattributes 2>/dev/null || true
 
       - name: Create or update private model dataset
-        if: ${{ github.event.inputs.skip_model_upload != 'true' }}
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' && github.event.inputs.skip_model_upload != 'true' }}
         run: |
           if kaggle datasets status "$KAGGLE_MODEL_DATASET" >/dev/null 2>&1; then
             kaggle datasets version -p .kaggle-model -m "Refresh IndicTrans2 weights" -q -t -r skip
@@ -127,6 +137,7 @@ jobs:
           fi
 
       - name: Ensure kernel metadata inputs
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         run: |
           python - <<'PY'
           import json
@@ -140,11 +151,13 @@ jobs:
           PY
 
       - name: Push and run Kaggle kernel
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         env:
           ACCELERATOR: ${{ inputs.accelerator || 'NvidiaTeslaT4' }}
         run: kaggle kernels push -p kaggle/kernel --accelerator "$ACCELERATOR" --timeout 7200
 
       - name: Print Kaggle kernel status
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         continue-on-error: true
         run: |
           KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])")
@@ -158,6 +171,9 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            if [ "$PARALLEL_TRAINING_READY" != "true" ]; then
+              JOB_STATUS="blocked-safely-no-approved-parallel-data"
+            fi
             curl --fail --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
               --data-urlencode "text=Santali AI GitHub workflow finished: ${JOB_STATUS}. Kaggle: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
