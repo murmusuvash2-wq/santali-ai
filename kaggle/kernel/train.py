@@ -29,7 +29,7 @@ ADAPTER_DIR = OUT / "adapter"
 HF_MODEL_ID = os.environ.get(
     "MODEL_ID", "ai4bharat/indictrans2-indic-indic-dist-320M"
 )
-SRC_LANG = "hin_Deva"
+SRC_LANG = "eng_Latn"
 TGT_LANG = "sat_Olck"
 OL_CHIKI = re.compile(r"[\u1C50-\u1C7F]")
 EPOCHS = float(os.environ.get("EPOCHS", "3"))
