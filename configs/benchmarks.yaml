@@ -1,0 +1,50 @@
+version: 1
+policy:
+  evaluation_only: true
+  never_train_on_benchmark_rows: true
+  require_source_hash: true
+  require_native_review_before_release: true
+tracks:
+  - id: en-sat-olchiki
+    source_lang: eng_Latn
+    target_lang: sat_Olck
+    script: Ol_Chiki
+    metric_profile: translation
+    status: ready_for_fixture
+  - id: sat-olchiki-en
+    source_lang: sat_Olck
+    target_lang: eng_Latn
+    script: Ol_Chiki
+    metric_profile: translation
+    status: ready_for_fixture
+  - id: hi-sat-olchiki
+    source_lang: hin_Deva
+    target_lang: sat_Olck
+    script: Ol_Chiki
+    metric_profile: translation
+    status: pending_licensed_data
+  - id: bn-sat-olchiki
+    source_lang: ben_Beng
+    target_lang: sat_Olck
+    script: Ol_Chiki
+    metric_profile: translation
+    status: pending_licensed_data
+  - id: sat-latin
+    source_lang: sat_Olck
+    target_lang: sat_Latn
+    script: Latin
+    metric_profile: transliteration
+    status: pending_native_standard
+metrics:
+  automatic:
+    - exact_match
+    - bleu
+    - chrf
+    - script_validity
+    - length_ratio
+  human:
+    - meaning_preservation
+    - fluency
+    - olchiki_spelling
+    - named_entities
+    - code_switch_handling
