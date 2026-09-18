@@ -42,6 +42,7 @@ CRITICAL_PKGS = [
     "sentencepiece",
     "pandas",
 ]
+TRANSFORMERS_VERSION = "4.46.3"
 
 LOCAL_MODEL_CANDIDATES = [
     os.environ.get("MODEL_PATH", "").strip(),
@@ -99,6 +100,11 @@ def _pip_install(spec: str, retries: int = 2) -> bool:
 
 def install_deps() -> None:
     log("Checking training dependencies...")
+    # IndicTrans2 remote code imports transformers.onnx, which is missing from
+    # newer Transformers builds preinstalled on some Kaggle images.
+    log(f"  enforcing transformers=={TRANSFORMERS_VERSION} for IndicTrans2 compatibility")
+    if not _pip_install(f"transformers=={TRANSFORMERS_VERSION}"):
+        raise RuntimeError("Could not install the Transformers version required by IndicTrans2.")
     missing = []
     for pkg in CRITICAL_PKGS:
         if _import_ok(pkg):
