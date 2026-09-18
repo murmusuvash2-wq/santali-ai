@@ -72,15 +72,18 @@ sources:
     name: MMLoSo 2025 English-Santali parallel data
     kind: parallel_text
     source_url: https://www.kaggle.com/competitions/mmloso2025/data
+    source_version: mmloso2025-santali-train.csv
+    artifact_path: data/raw/mmloso-2025/santali-train.csv
+    artifact_sha256: e044d53ebc4913ecbecbf1f9d5cba04b8f1a6e0f81192722b9b3ded0fe73b16c
     license: CC-BY-SA-4.0
     license_url: https://creativecommons.org/licenses/by-sa/4.0/
     attribution: "MMLoSo 2025 English-Santali shared task; retain attribution and share-alike notices from the exact release."
-    status: candidate
-    training_use: needs_exact_release_audit
-    redistribution: needs_exact_release_audit
+    status: approved
+    training_use: allowed
+    redistribution: allowed
     scripts: [Ol_Chiki]
     languages: [en, sat]
-    notes: "The paper reports a 20,000-pair Santali training arm. Do not use the count or download until the exact release files, hash, and Kaggle hosting terms are recorded."
+    notes: "Verified uploaded artifact: 20,000 data rows, English and Santali columns, Ol Chiki targets. Preserve CC BY-SA attribution and share-alike notice in every derived package."
   - id: flores-in-sat
     name: IndicGenBench FLORES-IN Santali evaluation
     kind: evaluation

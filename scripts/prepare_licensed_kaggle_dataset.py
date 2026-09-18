@@ -11,6 +11,8 @@ import argparse
 import csv
 import hashlib
 import json
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +21,12 @@ import yaml
 FIELDS = [
     "record_id", "source_id", "source", "target", "source_lang", "target_lang",
     "script", "transliteration_scheme", "domain", "license", "license_url",
-    "attribution", "verified", "code_switch", "split",
+    "attribution", "source_url", "verified", "code_switch", "split",
 ]
+OL_CHIKI = re.compile(r"[\u1C50-\u1C7F]")
+
+def normalize(value: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", value).strip().split())
 
 
 def sha256(path: Path) -> str:
@@ -52,6 +58,7 @@ def main() -> None:
         raise SystemExit("No approved parallel_text source is registered; refusing to build Kaggle data.")
 
     rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
     used_sources: list[dict[str, Any]] = []
     for source in candidates:
         artifact = source.get("artifact_path")
@@ -67,10 +74,15 @@ def main() -> None:
         with path.open(encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
             for index, raw in enumerate(reader, start=1):
-                source_text = (raw.get("source") or raw.get("src") or raw.get("src_en") or "").strip()
-                target_text = (raw.get("target") or raw.get("tgt") or raw.get("tgt_sat") or "").strip()
-                if not source_text or not target_text:
+                source_text = (raw.get("source") or raw.get("src") or raw.get("src_en") or raw.get("english") or raw.get("English") or "").strip()
+                target_text = (raw.get("target") or raw.get("tgt") or raw.get("tgt_sat") or raw.get("santali") or raw.get("Santali") or "").strip()
+                if not source_text or not target_text or not OL_CHIKI.search(target_text):
                     continue
+                source_text, target_text = normalize(source_text), normalize(target_text)
+                key = (source_text, target_text)
+                if key in seen:
+                    continue
+                seen.add(key)
                 rows.append({
                     "record_id": f"{source['id']}:{index}",
                     "source_id": source["id"],
@@ -83,6 +95,7 @@ def main() -> None:
                     "domain": raw.get("domain", "mixed"),
                     "license": source["license"],
                     "license_url": source.get("license_url", ""),
+                    "source_url": source.get("source_url", ""),
                     "attribution": source.get("attribution", ""),
                     "verified": "rights-approved-source",
                     "code_switch": raw.get("code_switch", "false"),

@@ -53,8 +53,8 @@ def main() -> None:
     with table.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter=delimiter)
         for index, row in enumerate(reader, start=1):
-            source_text = (row.get("source") or row.get("src") or row.get("src_en") or row.get("english") or "").strip()
-            target_text = (row.get("target") or row.get("tgt") or row.get("tgt_sat") or row.get("santali") or "").strip()
+            source_text = (row.get("source") or row.get("src") or row.get("src_en") or row.get("english") or row.get("English") or "").strip()
+            target_text = (row.get("target") or row.get("tgt") or row.get("tgt_sat") or row.get("santali") or row.get("Santali") or "").strip()
             if not source_text or not target_text:
                 continue
             rows.append({
@@ -68,6 +68,7 @@ def main() -> None:
                 "domain": row.get("domain", "mixed"),
                 "license": source["license"],
                 "license_url": source["license_url"],
+                "source_url": source["source_url"],
                 "attribution": source["attribution"],
                 "source_sha256": actual,
                 "verified": "release-hash-verified",
