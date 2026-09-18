@@ -1,0 +1,96 @@
+version: 1
+project: santali-ai
+policy:
+  default_training_eligible: false
+  require_license: true
+  require_training_permission: true
+  require_redistribution_permission: true
+  require_source_url: true
+  require_file_hash: true
+  require_attribution: true
+  exclude_unknown_license: true
+  exclude_evaluation_only: true
+  exclude_restricted_audio_from_kaggle: true
+sources:
+  - id: santali-wordlist-cc0
+    name: Santali Ol Chiki Word List
+    kind: lexicon
+    source_url: https://github.com/Prasanta-Hembram/Santali-Ol-Chiki-Spell-Checker
+    source_version: d4795f6025a16fc4087c820d1f066a1f09932f12
+    artifact_path: santali-wordlist/dictionaries/sat.dic
+    artifact_url: https://raw.githubusercontent.com/Prasanta-Hembram/Santali-Ol-Chiki-Spell-Checker/d4795f6025a16fc4087c820d1f066a1f09932f12/dictionaries/sat.dic
+    artifact_sha256: f9a4a14e1c32ed5e699abb6cf67d305dc7a36800b5f7e4dc7fc26709ae7c28e2
+    license: CC0-1.0
+    license_url: https://creativecommons.org/publicdomain/zero/1.0/
+    attribution: "Foundational Language Tech / O Foundation, Santali Word list (2021); repository code is MPL-2.0. Use only the confirmed CC0 word-list files."
+    status: approved
+    training_use: allowed
+    redistribution: allowed
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "Approved for the word-list artifact only. Do not include repository code, sat.aff, or unverified upstream files."
+  - id: ai4bharat-bpcc-sat
+    name: AI4Bharat BPCC Santali slice
+    kind: parallel_text
+    source_url: https://huggingface.co/datasets/ai4bharat/BPCC
+    license: CC0-1.0-packaging
+    license_url: https://huggingface.co/datasets/ai4bharat/BPCC
+    attribution: "AI4Bharat BPCC; preserve component-level provenance and the extracted-text rights notice."
+    status: candidate
+    training_use: needs_component_review
+    redistribution: needs_component_review
+    scripts: [Ol_Chiki, Devanagari, Bengali, Latin]
+    languages: [sat, hi, bn]
+    notes: "Corpus-wide totals are not Santali counts. Filter sat/sat_Olck rows only and audit each component/upstream source."
+  - id: common-voice-santali
+    name: Mozilla Common Voice Santali scripted speech
+    kind: speech
+    source_url: https://commonvoice.mozilla.org/en/datasets
+    license: CC0-1.0
+    license_url: https://commonvoice.mozilla.org/en/datasets
+    attribution: "Mozilla Common Voice; preserve release version, datasheet and contributor restrictions."
+    status: restricted_rehosting
+    training_use: review_release
+    redistribution: not_allowed_by_default
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "Use only in a controlled local workflow until re-hosting on Kaggle is explicitly cleared. Do not identify speakers."
+  - id: smol-santali
+    name: Google SMOL multilingual translation data
+    kind: parallel_text
+    source_url: https://huggingface.co/datasets/google/smol
+    license: CC-BY-4.0
+    license_url: https://creativecommons.org/licenses/by/4.0/
+    attribution: "Google Research SMOL; include attribution and change notice."
+    status: candidate
+    training_use: needs_release_audit
+    redistribution: needs_release_audit
+    scripts: [Ol_Chiki]
+    languages: [sat, en]
+    notes: "Use only the exact released Santali files after counting and checking the dataset card."
+  - id: flores-in-sat
+    name: IndicGenBench FLORES-IN Santali evaluation
+    kind: evaluation
+    source_url: https://huggingface.co/datasets/google/IndicGenBench_flores_in
+    license: CC-BY-SA-4.0
+    license_url: https://creativecommons.org/licenses/by-sa/4.0/
+    attribution: "Google Research IndicGenBench FLORES-IN."
+    status: evaluation_only
+    training_use: prohibited
+    redistribution: evaluation_only
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "Keep fully held out; the dataset card prohibits use in training corpora."
+  - id: mod4-current
+    name: Current English-Santali Mod4 copy
+    kind: parallel_text
+    source_url: https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4
+    license: unknown
+    license_url: https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4
+    attribution: "Source license not stated."
+    status: excluded_unknown_license
+    training_use: prohibited_until_cleared
+    redistribution: prohibited_until_cleared
+    scripts: [Ol_Chiki]
+    languages: [en, sat]
+    notes: "The existing 63,179-pair experiment must not be republished or mixed into the licensed corpus until the source license is confirmed."

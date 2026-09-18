@@ -64,10 +64,31 @@ jobs:
       - name: Install CLI tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --upgrade kaggle "huggingface_hub[cli]"
+          python -m pip install --upgrade kaggle "huggingface_hub[cli]" pyyaml
+
+      - name: Enforce licensed corpus gate
+        run: |
+          python scripts/audit_corpus.py --output-dir .corpus-audit
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('.corpus-audit/dataset-metadata.json').read_text())
+          approved_parallel = [
+              source for source in report['sources']
+              if source['eligible_for_kaggle_training'] == 'true'
+              and source['kind'] == 'parallel_text'
+          ]
+          print(f"Approved parallel source count: {len(approved_parallel)}")
+          if not approved_parallel:
+              raise SystemExit(
+                  "No parallel_text source is approved for Kaggle training. "
+                  "Verify license, training permission, redistribution permission, "
+                  "artifact hash, and attribution before adding a source."
+              )
+          PY
 
       - name: Prepare approved parallel dataset
-        run: python scripts/prepare_mod4_kaggle_dataset.py --output-dir .kaggle-dataset
+        run: python scripts/prepare_licensed_kaggle_dataset.py --output-dir .kaggle-dataset
 
       - name: Create or update private parallel dataset
         run: |

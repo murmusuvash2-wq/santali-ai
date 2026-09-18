@@ -31,6 +31,13 @@ The official Kaggle CLI documents that `kaggle kernels push` uploads the kernel 
 
 5. Push to `main`, or open **Actions → Kaggle training → Run workflow**.
 
+Before the runner uploads anything, it executes `scripts/audit_corpus.py` against
+`configs/licensed_sources.yaml`. A source is eligible only when its exact artifact,
+license, training permission, redistribution/private-hosting permission, attribution,
+and SHA-256 are recorded. Unknown-license, evaluation-only, or restricted-audio
+sources intentionally stop the workflow. This prevents the earlier Mod4 copy from
+being silently repackaged while its upstream license is unresolved.
+
 ## Security rules
 
 Never put a Kaggle token in the repository, workflow YAML, notebook, commit message or public dataset. Use GitHub Actions Secrets. Keep the Kaggle kernel private while the data is under review. Do not send private or consented speech data to a public Kaggle kernel.
@@ -55,5 +62,6 @@ Adapter + metrics are saved to Kaggle output
 
 - GitHub Actions only starts the Kaggle run; it does not bypass Kaggle quotas, GPU availability, account permissions or session limits.
 - A Kaggle input dataset must already be attached or referenced in kernel metadata.
+- A successful GitHub workflow means the licensed-corpus gate and Kaggle handoff passed; it does not by itself prove that a Kaggle kernel completed training. Check Kaggle output for `metrics.json` and adapter files.
 - The current workflow does not automatically download model outputs back into GitHub. Add a separate, authenticated download step only after deciding where model artifacts should be stored.
 - Kaggle metadata field names and accelerator availability can change. If Kaggle rejects a metadata field, run `kaggle kernels init` with the installed CLI version and update the JSON accordingly.
