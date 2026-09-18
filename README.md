@@ -1,126 +1,192 @@
 # Santali AI
 
-Open, data-first Santali AI stack for **Ol Chiki text**, Hindi/Santali translation, conversational assistance, and later voice interaction.
+> **Open-source language technology for Santali and Ol Chiki.**
 
-> **Current decision:** We will not train a foundation model from scratch. We will start from open Indian-language models, validate online datasets, fine-tune on Kaggle, and keep a native-speaker evaluation gate before deployment.
+[![Live dashboard](https://img.shields.io/badge/Live%20Dashboard-santali--ai--dashboard.vercel.app-0f766e?style=for-the-badge&logo=vercel&logoColor=white)](https://santali-ai-dashboard.vercel.app)
+[![Training](https://img.shields.io/badge/Training-Kaggle%20GPU-f59e0b?style=for-the-badge&logo=kaggle&logoColor=white)](https://www.kaggle.com/code/ezqrio/santali-ai-translation)
+[![Source](https://img.shields.io/badge/Source-GitHub-111827?style=for-the-badge&logo=github&logoColor=white)](https://github.com/murmusuvash2-wq/santali-ai)
 
-## Project status
+**[Open the live project dashboard →](https://santali-ai-dashboard.vercel.app)**
 
-**Phase:** Planning and data validation  
-**Training:** Kaggle GPU  
-**First milestone:** Hindi ↔ Santali text translation plus a verified Santali knowledge assistant  
-**Current data strategy:** Public online data can start the project, but it is not enough by itself for production quality. We must audit licenses, remove machine-generated noise, normalize Ol Chiki, and add native-speaker review.
+Santali AI is a transparent, data-first research project for building useful Santali language tools. The first milestone is reliable English–Santali translation in **Ol Chiki**, followed by a grounded conversational assistant and speech capabilities.
 
-## What we are building
+> **Project note:** This is research software. Training is being performed on Kaggle GPU infrastructure, with model quality evaluated using automated metrics and native-speaker review before any public release.
+
+## What is happening now?
+
+The current pipeline prepares an approved English–Santali parallel corpus, uploads private training inputs to Kaggle, attaches IndicTrans2, and runs a LoRA adaptation experiment.
+
+| Area | Current state |
+|---|---|
+| Live project dashboard | [Open dashboard](https://santali-ai-dashboard.vercel.app) |
+| Training platform | Kaggle GPU |
+| Base model | `ai4bharat/indictrans2-indic-indic-dist-320M` |
+| Translation direction | English → Santali (`eng_Latn` → `sat_Olck`) |
+| Training method | LoRA adapter fine-tuning |
+| Parallel corpus | 63,179 approved English–Santali pairs |
+| Dataset visibility | Private while provenance is reviewed |
+| Kernel | [ezqrio/santali-ai-translation](https://www.kaggle.com/code/ezqrio/santali-ai-translation) |
+
+Hinglish mein: **data preparation aur model upload automatic hai; Kaggle GPU queue mein aane ke baad training kernel run hota hai.** Dashboard se project ka overall progress dekha ja sakta hai.
+
+## Project vision
+
+Santali speakers ke liye practical, accessible aur community-reviewed language technology banana:
 
 ```text
-Phase 1  Hindi ↔ Santali translation API
-Phase 2  Santali chatbot with retrieval-augmented generation (RAG)
-Phase 3  ASR and TTS voice pipeline
-Phase 4  WhatsApp/Telegram and offline Android deployment
+Translation → Knowledge assistant → Speech → Mobile and messaging tools
 ```
 
-## Recommended models
+### Roadmap
 
-| Capability | Starting model | Decision |
+| Phase | Deliverable | Status |
 |---|---|---|
-| Translation | `ai4bharat/indictrans2-indic-indic-dist-320M` | Primary model; supports `sat_Olck` Santali and `hin_Deva` Hindi |
-| Chat reasoning | Qwen3-4B/8B Instruct with QLoRA | Use for response style and instruction following, not as the factual database |
-| Santali ASR | AI4Bharat IndicConformer Santali checkpoint | Start with inference; fine-tune only after collecting consented labelled speech |
-| Santali TTS | AI4Bharat IndicF5 or Indic Parler-TTS | Evaluate existing voices first; adapt only with licensed voice data |
+| 1 | English/Hindi ↔ Santali text translation | In progress |
+| 2 | Santali knowledge assistant with retrieval | Planned |
+| 3 | Santali ASR and TTS voice pipeline | Planned |
+| 4 | Telegram, WhatsApp and offline Android access | Planned |
 
-## Online data: can we start now?
+## Architecture
 
-**Yes, for a baseline and first Kaggle experiment.** The following resources are usable candidates:
+```mermaid
+flowchart LR
+    U[User: English / Hindi / Ol Chiki] --> D[Language and script detection]
+    D --> T[Translation gateway]
+    T --> M[IndicTrans2 + LoRA adapter]
+    M --> R[Translation response]
+    R --> E[BLEU / chrF / native review]
+    E --> G[Release gate]
 
-1. **AI4Bharat BPCC:** large multilingual parallel-corpus collection for Indic translation. Use only the relevant language pairs after filtering and license review.
-2. **AI4Bharat IndicTrans2 artifacts:** model, tokenizer, scripts, training and evaluation resources.
-3. **FLORES+:** Santali `sat_Olck` evaluation material. Keep it as a held-out test set; do not train on it.
-4. **AI4Bharat Rasa:** Santali speech data for TTS research, listed as CC-BY-4.0. Follow attribution and access conditions.
-5. **Common Voice Santali:** candidate ASR data. Verify the current release, locale, clip count, transcript quality and CC0 terms before downloading.
-6. **Public Santali text:** Wikipedia and other openly licensed/public-domain sources, after provenance and script checks.
+    S[Approved parallel data] --> V[Validation and deduplication]
+    V --> K[Kaggle GPU training]
+    K --> M
+    K --> A[Adapter + metrics]
+```
 
-Online data is **not sufficient alone** for a reliable public bot. Machine-translated pairs, duplicate web text, mixed scripts, dialect variation and incorrect Ol Chiki spellings must be measured. Production requires native-speaker review and consented field speech.
+## Data and provenance
 
-## Repository layout
+The first experiment uses the [English–Santali Mod4 corpus](https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4). The current automated preparation step downloads the train, validation and test files, normalizes the schema, removes duplicate pairs, and creates a private Kaggle dataset.
+
+| Property | Value |
+|---|---|
+| Source | English–Santali Mod4 |
+| Records | 63,179 pairs |
+| Script | Santali in Ol Chiki |
+| Source field | `src` |
+| Target field | `tgt` |
+| Training schema | `source`, `target`, `source_lang`, `target_lang` |
+| Source license | Currently unclear; private use only pending confirmation |
+
+The dataset is **not being redistributed publicly** until the original provenance and license are confirmed. FLORES+ is reserved for held-out evaluation and is not used as training data.
+
+## Repository structure
 
 ```text
 .
 ├── README.md
 ├── LICENSE
 ├── CITATION.cff
-├── Makefile
-├── requirements.txt
-├── .env.example
 ├── configs/
 │   ├── data_sources.yaml
 │   └── translation_lora.yaml
-├── data/
-│   ├── README.md
-│   ├── raw/.gitkeep
-│   ├── interim/.gitkeep
-│   ├── processed/.gitkeep
-│   └── manifests/.gitkeep
+├── data/                         # Local data placeholders; downloads are ignored
+├── diagrams/
+│   └── architecture.mmd
 ├── docs/
 │   ├── PLAN.md
 │   ├── DATA_POLICY.md
-│   ├── KAGGLE.md
-│   └── EVALUATION.md
-├── diagrams/
-│   └── architecture.mmd
+│   ├── DATA_SOURCE_REVIEW.md
+│   ├── EVALUATION.md
+│   ├── GITHUB_KAGGLE.md
+│   └── KAGGLE.md
+├── kaggle/kernel/
+│   ├── kernel-metadata.json
+│   ├── requirements-kaggle.txt
+│   └── train.py                  # Self-contained Kaggle entrypoint
 ├── scripts/
+│   ├── prepare_mod4_kaggle_dataset.py
 │   ├── validate_parallel.py
 │   ├── normalize_olchiki.py
 │   └── split_parallel.py
-├── training/
-│   ├── kaggle_translation_lora.py
-│   └── kaggle_prepare_data.py
-└── src/santali_ai/
-    └── __init__.py
+└── training/
+    ├── kaggle_prepare_data.py
+    └── kaggle_translation_lora.py
 ```
 
 ## Quick start
 
 ```bash
+git clone https://github.com/murmusuvash2-wq/santali-ai.git
+cd santali-ai
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python scripts/validate_parallel.py --input data/raw/parallel.csv --output data/interim/parallel_validated.csv
-python scripts/split_parallel.py --input data/interim/parallel_validated.csv --output-dir data/processed
 ```
 
-## Kaggle workflow
+Validate a local parallel CSV:
 
-1. Create a Kaggle notebook with GPU enabled.
-2. Add the approved public datasets as Kaggle inputs or download them using the Hugging Face `datasets` library.
-3. Run `training/kaggle_prepare_data.py`.
-4. Inspect the validation report before training.
-5. Run `training/kaggle_translation_lora.py`.
-6. Export the adapter and tokenizer as a Kaggle output.
-7. Evaluate on the held-out FLORES+/native-review set.
-8. Do not upload private, consented or restricted data to a public Kaggle dataset.
+```bash
+python scripts/validate_parallel.py \
+  --input data/raw/parallel.csv \
+  --output data/interim/parallel_validated.csv
 
-Kaggle is appropriate for the first translation experiment. For a larger full fine-tune, ASR, or TTS job, use a controlled GPU environment with persistent storage.
+python scripts/split_parallel.py \
+  --input data/interim/parallel_validated.csv \
+  --output-dir data/processed
+```
 
-## Quality gates
+## Kaggle training flow
 
-A model cannot be marked production-ready until it passes all of these gates:
+The GitHub Actions workflow handles the repeatable parts:
 
-- No train/test leakage by source sentence or speaker.
-- At least two native Santali reviewers inspect a held-out sample.
-- Ol Chiki Unicode and script checks pass.
-- BLEU/chrF are reported together with human adequacy and fluency scores.
-- Safety tests cover medical, agriculture, hate, privacy and unknown questions.
-- Every dataset has a source, license, consent/provenance and transformation record.
+1. Check Kaggle and Hugging Face credentials.
+2. Prepare the approved parallel dataset.
+3. Create or update the private Kaggle data input.
+4. Download IndicTrans2 using `HF_TOKEN`.
+5. Create or update the private model input.
+6. Attach both inputs to the Kaggle kernel.
+7. Push the kernel with an Nvidia T4 GPU.
+8. Save the LoRA adapter and evaluation artifacts.
 
-## References
+Run it manually from **GitHub → Actions → Kaggle training → Run workflow**. Required repository secrets are `KAGGLE_API_TOKEN` and `HF_TOKEN`; Telegram notification is optional.
 
-[1]: https://github.com/ai4bharat/IndicTrans2 "AI4Bharat IndicTrans2 repository"
-[2]: https://ai4bharat.iitm.ac.in/areas/model/ASR/IndicConformer/ "AI4Bharat IndicConformer ASR"
-[3]: https://huggingface.co/datasets/ai4bharat/BPCC "AI4Bharat BPCC dataset"
-[4]: https://huggingface.co/datasets/openlanguagedata/flores_plus "FLORES+ evaluation dataset"
-[5]: https://huggingface.co/datasets/ai4bharat/Rasa "AI4Bharat Rasa TTS dataset"
-[6]: https://github.com/common-voice/common-voice "Mozilla Common Voice project"
-[7]: https://github.com/QwenLM/Qwen3 "Qwen3 official repository"
+## Quality and release gates
+
+A model will not be called production-ready until it passes all of the following:
+
+- No sentence or speaker leakage between train and evaluation sets.
+- Unicode and Ol Chiki script validation.
+- BLEU and chrF reported on a held-out test set.
+- Native-speaker adequacy and fluency review.
+- Safety tests for medical, agriculture, hate, privacy and unknown questions.
+- Dataset source, license, consent and transformation records.
+- Clear model card describing limitations and intended use.
+
+## Open-source principles
+
+**Transparency:** training data, scripts and decisions are documented.
+
+**Community review:** native Santali speakers are part of the evaluation loop.
+
+**Responsible release:** unclear-license or consent-sensitive data remains private.
+
+**Practical access:** the long-term goal is useful tooling through web, mobile and messaging interfaces—not only a benchmark score.
+
+## Useful links
+
+- **Live dashboard:** https://santali-ai-dashboard.vercel.app
+- **GitHub repository:** https://github.com/murmusuvash2-wq/santali-ai
+- **Dashboard source:** https://github.com/murmusuvash2-wq/santali-ai-dashboard
+- **Kaggle kernel:** https://www.kaggle.com/code/ezqrio/santali-ai-translation
+- **Dataset source:** https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4
+- **IndicTrans2:** https://github.com/ai4bharat/IndicTrans2
+
+## Contributing
+
+Contributions are welcome, especially native-speaker corrections, licensed Santali text, evaluation examples, Ol Chiki normalization rules, documentation improvements and reproducible experiments. Please open an issue before adding a new dataset so that provenance and licensing can be reviewed first.
+
+## License
+
+The software in this repository is released under the [MIT License](LICENSE). Individual datasets and model weights retain their own licenses and terms; consult the relevant source before reuse.
 
 This project is research software. Model outputs are not medical, legal or emergency advice.
