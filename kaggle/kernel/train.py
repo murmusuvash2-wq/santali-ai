@@ -381,6 +381,7 @@ def prepare_data() -> Path:
 # ---------------------------------------------------------------------------
 def train_lora(data_dir: Path) -> None:
     import pandas as pd
+    import torch
     from datasets import Dataset, DatasetDict
     from transformers import DataCollatorForSeq2Seq, Seq2SeqTrainer, Seq2SeqTrainingArguments
     from peft import LoraConfig, TaskType, get_peft_model
@@ -427,7 +428,32 @@ def train_lora(data_dir: Path) -> None:
     )
     collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA GPU is not available. Training must not run on CPU: the 320M model is too slow "
+            "and the previous CPU run produced loss=0/NaN. Enable Kaggle GPU in Settings > Accelerator "
+            "and rerun."
+        )
+    sanity_batch = collator([tokenized["train"][0], tokenized["train"][1]])
+    label_tokens = int((sanity_batch["labels"] != -100).sum().item())
+    if label_tokens == 0:
+        raise RuntimeError("Sanity check failed: all label tokens are masked; refusing to train.")
+    model.eval()
+    with torch.no_grad():
+        sanity_outputs = model(**{key: value.to(model.device) for key, value in sanity_batch.items()})
+    sanity_loss = float(sanity_outputs.loss.detach().float().cpu())
+    log(
+        f"Sanity check: label_tokens={label_tokens}, initial_loss={sanity_loss:.6f}, "
+        f"cuda={torch.cuda.get_device_name(0)}"
+    )
+    if not torch.isfinite(sanity_outputs.loss):
+        raise RuntimeError(
+            f"Sanity check failed: initial loss is {sanity_loss}; refusing to start training. "
+            "Check model weights, dtype, and tokenizer compatibility."
+        )
+
     ADAPTER_DIR.mkdir(parents=True, exist_ok=True)
+    use_fp16 = torch.cuda.is_available()
     args = Seq2SeqTrainingArguments(
         output_dir=str(ADAPTER_DIR),
         learning_rate=5e-5,
@@ -440,7 +466,7 @@ def train_lora(data_dir: Path) -> None:
         save_steps=250,
         logging_steps=25,
         predict_with_generate=True,
-        fp16=True,
+        fp16=use_fp16,
         report_to="none",
         save_total_limit=2,
     )
