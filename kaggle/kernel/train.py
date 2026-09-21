@@ -321,7 +321,18 @@ def install_stable_seq2seq_loss(model):
 
     def stable_forward(self, *args, labels=None, **kwargs):
         if labels is not None and "decoder_input_ids" not in kwargs and "decoder_inputs_embeds" not in kwargs:
-            kwargs["decoder_input_ids"] = self.prepare_decoder_input_ids_from_labels(labels)
+            base = self.get_base_model()
+            config = base.config
+            start_id = config.decoder_start_token_id
+            if start_id is None:
+                start_id = config.pad_token_id
+            if start_id is None:
+                raise RuntimeError("IndicTrans2 config has neither decoder_start_token_id nor pad_token_id")
+            decoder_input_ids = labels.new_full(labels.shape, config.pad_token_id or 0)
+            decoder_input_ids[:, 1:] = labels[:, :-1].clone()
+            decoder_input_ids[:, 0] = start_id
+            decoder_input_ids.masked_fill_(decoder_input_ids == -100, config.pad_token_id or 0)
+            kwargs["decoder_input_ids"] = decoder_input_ids
         outputs = original_forward(*args, labels=None, **kwargs)
         if labels is not None:
             logits = outputs.logits.float()
