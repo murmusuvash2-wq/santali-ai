@@ -321,6 +321,7 @@ def install_stable_seq2seq_loss(model):
     """Bypass the legacy IndicTrans2 loss path and compute CE from finite logits."""
     import types
     import torch.nn.functional as F
+    from transformers.modeling_outputs import Seq2SeqLMOutput
 
     def stable_forward(self, *args, labels=None, **kwargs):
         if labels is not None and "decoder_input_ids" not in kwargs and "decoder_inputs_embeds" not in kwargs:
@@ -346,7 +347,17 @@ def install_stable_seq2seq_loss(model):
                 labels.reshape(-1),
                 ignore_index=-100,
             )
-            outputs.loss = loss
+            outputs = Seq2SeqLMOutput(
+                loss=loss,
+                logits=outputs.logits,
+                past_key_values=getattr(outputs, "past_key_values", None),
+                decoder_hidden_states=getattr(outputs, "decoder_hidden_states", None),
+                decoder_attentions=getattr(outputs, "decoder_attentions", None),
+                cross_attentions=getattr(outputs, "cross_attentions", None),
+                encoder_last_hidden_state=getattr(outputs, "encoder_last_hidden_state", None),
+                encoder_hidden_states=getattr(outputs, "encoder_hidden_states", None),
+                encoder_attentions=getattr(outputs, "encoder_attentions", None),
+            )
         return outputs
 
     model.forward = types.MethodType(stable_forward, model)
