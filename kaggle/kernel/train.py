@@ -317,8 +317,6 @@ def install_stable_seq2seq_loss(model):
     import types
     import torch.nn.functional as F
 
-    original_forward = model.forward
-
     def stable_forward(self, *args, labels=None, **kwargs):
         if labels is not None and "decoder_input_ids" not in kwargs and "decoder_inputs_embeds" not in kwargs:
             base = self.get_base_model()
@@ -333,7 +331,9 @@ def install_stable_seq2seq_loss(model):
             decoder_input_ids[:, 0] = start_id
             decoder_input_ids.masked_fill_(decoder_input_ids == -100, config.pad_token_id or 0)
             kwargs["decoder_input_ids"] = decoder_input_ids
-        outputs = original_forward(*args, labels=None, **kwargs)
+        # Call the current replica's local PEFT base model. Capturing a bound
+        # forward method here would pin DataParallel replicas to cuda:0.
+        outputs = self.base_model(*args, labels=None, **kwargs)
         if labels is not None:
             logits = outputs.logits.float()
             loss = F.cross_entropy(
