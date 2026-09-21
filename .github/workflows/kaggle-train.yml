@@ -1,6 +1,9 @@
 name: Kaggle training
 
 on:
+  # Every Monday at 20:00 IST (14:30 UTC). Manual dispatch remains available.
+  schedule:
+    - cron: '30 14 * * 1'
   workflow_dispatch:
     inputs:
       accelerator:

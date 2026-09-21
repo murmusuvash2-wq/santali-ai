@@ -215,9 +215,23 @@ def patch_local_model_for_transformers(model_ref: str) -> str:
             source,
             count=1,
         )
+        # Newer Transformers removed this helper from PreTrainedModel, while
+        # IndicTrans2's custom implementation still calls it from tie_weights.
+        compat_method = """    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
+        output_embeddings.weight = input_embeddings.weight
+        if hasattr(output_embeddings, \"out_features\") and hasattr(input_embeddings, \"num_embeddings\"):
+            output_embeddings.out_features = input_embeddings.num_embeddings
+
+"""
+        updated = re.sub(
+            r"    def tie_weights\(",
+            compat_method + "    def tie_weights(",
+            updated,
+            count=1,
+        )
         if updated != source:
             modeling.write_text(updated, encoding="utf-8")
-            log("  patched IndicTrans2 tie_weights signature for local loader")
+            log("  patched IndicTrans2 tie_weights compatibility for local loader")
     return str(patched)
 
 
