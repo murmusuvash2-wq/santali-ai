@@ -1,5 +1,5 @@
 {
-  "id": "ezqrio/santali-ai-translation",
+  "id": "janaiworkspace/santali-ai-translation",
   "title": "Santali AI Translation",
   "code_file": "train.py",
   "language": "python",
@@ -9,8 +9,8 @@
   "enable_internet": true,
   "machine_shape": "NvidiaTeslaT4",
   "dataset_sources": [
-    "ezqrio/approved-parallel",
-    "ezqrio/indictrans2-320m"
+    "janaiworkspace/approved-parallel",
+    "janaiworkspace/indictrans2-320m"
   ],
   "competition_sources": [],
   "kernel_sources": [],

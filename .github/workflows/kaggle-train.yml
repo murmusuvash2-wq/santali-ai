@@ -32,7 +32,7 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_MODEL_ID: ai4bharat/indictrans2-indic-indic-dist-320M
-      KAGGLE_MODEL_DATASET: ezqrio/indictrans2-320m
+      KAGGLE_MODEL_DATASET: janaiworkspace/indictrans2-320m
 
     steps:
       - name: Checkout repository
@@ -102,7 +102,7 @@ jobs:
       - name: Create or update private parallel dataset
         if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         run: |
-          if kaggle datasets status ezqrio/approved-parallel >/dev/null 2>&1; then
+          if kaggle datasets status janaiworkspace/approved-parallel >/dev/null 2>&1; then
             kaggle datasets version -p .kaggle-dataset -m "Refresh approved Mod4 corpus" -q -t -r skip
           else
             kaggle datasets create -p .kaggle-dataset -q -t -r skip
@@ -144,7 +144,7 @@ jobs:
           from pathlib import Path
           p = Path("kaggle/kernel/kernel-metadata.json")
           m = json.loads(p.read_text())
-          m["dataset_sources"] = ["ezqrio/approved-parallel", "ezqrio/indictrans2-320m"]
+          m["dataset_sources"] = ["janaiworkspace/approved-parallel", "janaiworkspace/indictrans2-320m"]
           m["enable_gpu"] = True
           m["enable_internet"] = True
           p.write_text(json.dumps(m, indent=2) + "\n")
@@ -176,5 +176,5 @@ jobs:
             fi
             curl --silent --show-error -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
               --data-urlencode "chat_id=8882400158" \
-              --data-urlencode "text=Santali AI GitHub workflow finished: ${JOB_STATUS}. Kaggle: https://www.kaggle.com/code/ezqrio/santali-ai-translation"
+              --data-urlencode "text=Santali AI GitHub workflow finished: ${JOB_STATUS}. Kaggle: https://www.kaggle.com/code/janaiworkspace/santali-ai-translation"
           fi

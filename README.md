@@ -3,7 +3,7 @@
 > **Open-source language technology for Santali and Ol Chiki.**
 
 [![Live dashboard](https://img.shields.io/badge/Live%20Dashboard-santali--ai--dashboard.vercel.app-0f766e?style=for-the-badge&logo=vercel&logoColor=white)](https://santali-ai-dashboard.vercel.app)
-[![Training](https://img.shields.io/badge/Training-Kaggle%20GPU-f59e0b?style=for-the-badge&logo=kaggle&logoColor=white)](https://www.kaggle.com/code/ezqrio/santali-ai-translation)
+[![Training](https://img.shields.io/badge/Training-Kaggle%20GPU-f59e0b?style=for-the-badge&logo=kaggle&logoColor=white)](https://www.kaggle.com/code/janaiworkspace/santali-ai-translation)
 [![Source](https://img.shields.io/badge/Source-GitHub-111827?style=for-the-badge&logo=github&logoColor=white)](https://github.com/murmusuvash2-wq/santali-ai)
 
 **[Open the live project dashboard →](https://santali-ai-dashboard.vercel.app)**
@@ -25,7 +25,7 @@ The current pipeline prepares an approved English–Santali parallel corpus, upl
 | Training method | LoRA adapter fine-tuning |
 | Parallel corpus | 63,179 approved English–Santali pairs |
 | Dataset visibility | Private while provenance is reviewed |
-| Kernel | [ezqrio/santali-ai-translation](https://www.kaggle.com/code/ezqrio/santali-ai-translation) |
+| Kernel | [janaiworkspace/santali-ai-translation](https://www.kaggle.com/code/janaiworkspace/santali-ai-translation) |
 
 Hinglish mein: **data preparation aur model upload automatic hai; Kaggle GPU queue mein aane ke baad training kernel run hota hai.** Dashboard se project ka overall progress dekha ja sakta hai.
 
@@ -177,7 +177,7 @@ A model will not be called production-ready until it passes all of the following
 - **Live dashboard:** https://santali-ai-dashboard.vercel.app
 - **GitHub repository:** https://github.com/murmusuvash2-wq/santali-ai
 - **Dashboard source:** https://github.com/murmusuvash2-wq/santali-ai-dashboard
-- **Kaggle kernel:** https://www.kaggle.com/code/ezqrio/santali-ai-translation
+- **Kaggle kernel:** https://www.kaggle.com/code/janaiworkspace/santali-ai-translation
 - **Dataset source:** https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4
 - **IndicTrans2:** https://github.com/ai4bharat/IndicTrans2
 

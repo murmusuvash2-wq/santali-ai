@@ -186,7 +186,7 @@ def resolve_model_source() -> str:
                 return str(parent)
 
     log(f"No local model under /kaggle/input — HF id: {HF_MODEL_ID}")
-    log("Attach dataset ezqrio/indictrans2-320m to avoid network dependency.")
+    log("Attach dataset janaiworkspace/indictrans2-320m to avoid network dependency.")
     return HF_MODEL_ID
 
 
@@ -252,8 +252,8 @@ def load_tokenizer_and_model(model_ref: str):
         raise RuntimeError(
             "No local model attached and huggingface.co is unreachable (DNS/network).\n"
             "Do NOT wait — fix one of these:\n"
-            "  1) Run GitHub Actions with HF_TOKEN so ezqrio/indictrans2-320m is uploaded\n"
-            "  2) Kernel → Add Input → dataset ezqrio/indictrans2-320m\n"
+            "  1) Run GitHub Actions with HF_TOKEN so janaiworkspace/indictrans2-320m is uploaded\n"
+            "  2) Kernel → Add Input → dataset janaiworkspace/indictrans2-320m\n"
             "  3) Settings → Internet ON, then re-run when Kaggle DNS works\n"
             f"  Current /kaggle/input: {list(Path('/kaggle/input').iterdir()) if Path('/kaggle/input').exists() else []}"
         )
@@ -273,7 +273,7 @@ def load_tokenizer_and_model(model_ref: str):
 
     raise RuntimeError(
         f"Failed to load model {model_ref!r}.\nLast error: {last_err}\n"
-        "Prefer attaching local dataset ezqrio/indictrans2-320m."
+        "Prefer attaching local dataset janaiworkspace/indictrans2-320m."
     ) from last_err
 
 
@@ -344,7 +344,7 @@ def prepare_data() -> Path:
         else:
             raise FileNotFoundError(
                 f"Input CSV not found: {INPUT_CSV}\n"
-                "Attach dataset ezqrio/approved-parallel."
+                "Attach dataset janaiworkspace/approved-parallel."
             )
 
     log(f"Reading {csv_path}")

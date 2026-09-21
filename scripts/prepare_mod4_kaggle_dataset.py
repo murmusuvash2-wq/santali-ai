@@ -65,7 +65,7 @@ def main() -> None:
         "title": "Santali AI Approved Parallel",
         "subtitle": "English to Santali Ol Chiki corpus for private model training.",
         "description": "Private training copy generated from the approved English-Santali Mod4 corpus. Source: https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4. The source repository does not publish a clear license; this copy is kept private pending provenance confirmation.",
-        "id": "ezqrio/approved-parallel",
+        "id": "janaiworkspace/approved-parallel",
         "licenses": [{"name": "unknown"}],
         "userSpecifiedSources": "Source dataset: aiswarya9302/english-santali-datasetmod4; source license is not stated on the dataset card.",
         "resources": [{"path": "parallel.csv", "description": "Deduplicated English to Santali Ol Chiki pairs.", "schema": {"fields": [

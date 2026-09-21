@@ -17,13 +17,13 @@ Folder must contain at least:
 
 ## 2. Create Kaggle dataset
 
-- Name suggestion: `indictrans2-320m` (owner: `ezqrio`)
+- Name suggestion: `indictrans2-320m` (owner: `janaiworkspace`)
 - Upload the folder contents
 - Keep private or public
 
 ## 3. Attach to the kernel
 
-On https://www.kaggle.com/code/ezqrio/santali-ai-translation
+On https://www.kaggle.com/code/janaiworkspace/santali-ai-translation
 
 1. **Add Input** → your dataset `indictrans2-320m`
 2. Re-run
