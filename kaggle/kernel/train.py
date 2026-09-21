@@ -215,9 +215,17 @@ def patch_local_model_for_transformers(model_ref: str) -> str:
         # wrong direction and produce NaN logits. Preserve the checkpoint as
         # stored and make this legacy hook a no-op for local inference/training.
         updated = re.sub(
-            r"    def tie_weights\(self(?:, [^)]*)?\):\n(?:        .*\n)+?(?=    def |\Z)",
-            "    def tie_weights(self, *args, **kwargs):\n        return\n\n",
+            r"def tie_weights\(self(?:, [^)]*)?\):",
+            "def tie_weights(self, *args, **kwargs):",
             source,
+            count=1,
+        )
+        # The legacy method body calls this helper; keep the checkpoint's
+        # separately stored matrices untouched instead of tying them.
+        updated = re.sub(
+            r"    def tie_weights\(",
+            "    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):\n        return\n\n    def tie_weights(",
+            updated,
             count=1,
         )
         config_path = patched / "config.json"
