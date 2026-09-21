@@ -187,6 +187,45 @@ jobs:
           KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])")
           kaggle kernels status "$KERNEL_ID" || true
 
+      - name: Wait for Kaggle training and download artifacts
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
+        timeout-minutes: 210
+        run: |
+          KERNEL_ID=$(python -c "import json; print(json.load(open('kaggle/kernel/kernel-metadata.json'))['id'])")
+          mkdir -p kaggle-output
+          final_status=""
+          for attempt in $(seq 1 180); do
+            status=$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)
+            echo "[$attempt/180] $status"
+            if echo "$status" | grep -Eq 'COMPLETE|ERROR|FAILED'; then
+              final_status="$status"
+              break
+            fi
+            sleep 60
+          done
+          if [ -z "$final_status" ]; then
+            echo "Kaggle kernel did not finish within the wait window."
+            exit 1
+          fi
+          if echo "$final_status" | grep -Eq 'ERROR|FAILED'; then
+            echo "Kaggle kernel failed: $final_status"
+            exit 1
+          fi
+          kaggle kernels output "$KERNEL_ID" -p kaggle-output --force
+          test -n "$(find kaggle-output -type f -print -quit)" || {
+            echo "Kaggle completed but returned no output files."
+            exit 1
+          }
+
+      - name: Upload training artifacts
+        if: ${{ always() && env.PARALLEL_TRAINING_READY == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: santali-training-output-${{ github.run_id }}
+          path: kaggle-output/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Notify Telegram - workflow finished
         if: always()
         continue-on-error: true
