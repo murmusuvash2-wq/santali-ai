@@ -521,10 +521,21 @@ def train_lora(data_dir: Path) -> None:
         raise RuntimeError("Sanity check failed: all label tokens are masked; refusing to train.")
     model.eval()
     with torch.no_grad():
-        sanity_outputs = model(**{key: value.to(model.device) for key, value in sanity_batch.items()})
+        sanity_inputs = {key: value.to(model.device) for key, value in sanity_batch.items()}
+        sanity_outputs = model(**sanity_inputs)
     if not torch.isfinite(sanity_outputs.logits).all():
         finite_ratio = torch.isfinite(sanity_outputs.logits).float().mean().item()
-        raise RuntimeError(f"Preflight failed: logits contain non-finite values; finite_ratio={finite_ratio:.6f}")
+        log(f"Preflight wrapper logits: finite_ratio={finite_ratio:.6f}")
+        base = model.get_base_model()
+        base_inputs = {key: value for key, value in sanity_inputs.items() if key != "labels"}
+        with torch.no_grad():
+            base_outputs = base(**base_inputs)
+        base_ratio = torch.isfinite(base_outputs.logits).float().mean().item()
+        log(f"Preflight base-model logits: finite_ratio={base_ratio:.6f}")
+        raise RuntimeError(
+            "Preflight failed: logits contain non-finite values; "
+            f"wrapper_finite_ratio={finite_ratio:.6f}, base_finite_ratio={base_ratio:.6f}"
+        )
     sanity_loss = float(sanity_outputs.loss.detach().float().cpu())
     log(
         f"Sanity check: label_tokens={label_tokens}, initial_loss={sanity_loss:.6f}, "
