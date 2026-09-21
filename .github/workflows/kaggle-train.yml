@@ -136,6 +136,27 @@ jobs:
             kaggle datasets create -p .kaggle-model -q -t -r skip
           fi
 
+      - name: Wait for model dataset availability
+        if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
+        run: |
+          echo "Waiting for $KAGGLE_MODEL_DATASET to become attachable..."
+          for attempt in $(seq 1 30); do
+            if kaggle datasets status "$KAGGLE_MODEL_DATASET" >/tmp/model-dataset-status.txt 2>&1; then
+              if kaggle datasets files "$KAGGLE_MODEL_DATASET" --page-size 200 -v >/tmp/model-dataset-files.csv 2>&1; then
+                if grep -Fq "config.json" /tmp/model-dataset-files.csv; then
+                  echo "Model dataset is available and contains config.json."
+                  exit 0
+                fi
+              fi
+            fi
+            echo "Attempt $attempt/30: model dataset is not ready yet."
+            sleep 10
+          done
+          echo "Model dataset did not become attachable or is missing config.json."
+          cat /tmp/model-dataset-status.txt 2>/dev/null || true
+          cat /tmp/model-dataset-files.csv 2>/dev/null || true
+          exit 1
+
       - name: Ensure kernel metadata inputs
         if: ${{ env.PARALLEL_TRAINING_READY == 'true' }}
         run: |
