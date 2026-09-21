@@ -312,6 +312,30 @@ def load_tokenizer_and_model(model_ref: str):
     ) from last_err
 
 
+def install_stable_seq2seq_loss(model):
+    """Bypass the legacy IndicTrans2 loss path and compute CE from finite logits."""
+    import types
+    import torch.nn.functional as F
+
+    original_forward = model.forward
+
+    def stable_forward(self, *args, labels=None, **kwargs):
+        outputs = original_forward(*args, labels=None, **kwargs)
+        if labels is not None:
+            logits = outputs.logits.float()
+            loss = F.cross_entropy(
+                logits.reshape(-1, logits.size(-1)),
+                labels.reshape(-1),
+                ignore_index=-100,
+            )
+            outputs.loss = loss
+        return outputs
+
+    model.forward = types.MethodType(stable_forward, model)
+    log("Installed stable manual cross-entropy loss path")
+    return model
+
+
 # ---------------------------------------------------------------------------
 # Data prep
 # ---------------------------------------------------------------------------
@@ -447,6 +471,7 @@ def train_lora(data_dir: Path) -> None:
         target_modules=["q_proj", "k_proj", "v_proj", "out_proj"],
     )
     model = get_peft_model(model, peft_config)
+    model = install_stable_seq2seq_loss(model)
     model.print_trainable_parameters()
 
     def encode(batch):
@@ -471,11 +496,17 @@ def train_lora(data_dir: Path) -> None:
         )
     sanity_batch = collator([tokenized["train"][0], tokenized["train"][1]])
     label_tokens = int((sanity_batch["labels"] != -100).sum().item())
+    label_min = int(sanity_batch["labels"][sanity_batch["labels"] != -100].min().item())
+    label_max = int(sanity_batch["labels"][sanity_batch["labels"] != -100].max().item())
+    log(f"Preflight labels: nonpad={label_tokens}, min={label_min}, max={label_max}, vocab={model.config.vocab_size}")
     if label_tokens == 0:
         raise RuntimeError("Sanity check failed: all label tokens are masked; refusing to train.")
     model.eval()
     with torch.no_grad():
         sanity_outputs = model(**{key: value.to(model.device) for key, value in sanity_batch.items()})
+    if not torch.isfinite(sanity_outputs.logits).all():
+        finite_ratio = torch.isfinite(sanity_outputs.logits).float().mean().item()
+        raise RuntimeError(f"Preflight failed: logits contain non-finite values; finite_ratio={finite_ratio:.6f}")
     sanity_loss = float(sanity_outputs.loss.detach().float().cpu())
     log(
         f"Sanity check: label_tokens={label_tokens}, initial_loss={sanity_loss:.6f}, "
@@ -488,7 +519,8 @@ def train_lora(data_dir: Path) -> None:
         )
 
     ADAPTER_DIR.mkdir(parents=True, exist_ok=True)
-    use_fp16 = torch.cuda.is_available()
+    use_fp16 = torch.cuda.is_available() and os.environ.get("ENABLE_FP16", "0") == "1"
+    log(f"Precision: fp16={use_fp16}; set ENABLE_FP16=1 only after the FP32 preflight passes")
     args = Seq2SeqTrainingArguments(
         output_dir=str(ADAPTER_DIR),
         learning_rate=5e-5,
