@@ -20,6 +20,11 @@ import time
 import unicodedata
 from pathlib import Path
 
+# IndicTrans2's custom remote-code forward is not safe under Kaggle's
+# implicit multi-GPU DataParallel replicas. Keep one deterministic GPU visible
+# so every tensor and adapter stays on the same device.
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 INPUT_CSV = os.environ.get(
     "INPUT_CSV", "/kaggle/input/approved-parallel/parallel.csv"
 )
