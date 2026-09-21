@@ -320,6 +320,8 @@ def install_stable_seq2seq_loss(model):
     original_forward = model.forward
 
     def stable_forward(self, *args, labels=None, **kwargs):
+        if labels is not None and "decoder_input_ids" not in kwargs and "decoder_inputs_embeds" not in kwargs:
+            kwargs["decoder_input_ids"] = self.prepare_decoder_input_ids_from_labels(labels)
         outputs = original_forward(*args, labels=None, **kwargs)
         if labels is not None:
             logits = outputs.logits.float()
