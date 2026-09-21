@@ -234,6 +234,7 @@ def disable_incompatible_torchao() -> None:
 
 
 def load_tokenizer_and_model(model_ref: str):
+    import torch
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
     is_local = Path(model_ref).exists()
@@ -243,7 +244,23 @@ def load_tokenizer_and_model(model_ref: str):
         log(f"Loading LOCAL model (no network wait): {model_ref}")
         compatible_ref = patch_local_model_for_transformers(model_ref)
         tokenizer = AutoTokenizer.from_pretrained(compatible_ref, trust_remote_code=True, local_files_only=True)
-        model = AutoModelForSeq2SeqLM.from_pretrained(compatible_ref, trust_remote_code=True, local_files_only=True)
+        # The Kaggle model dataset contains both safetensors and PyTorch weights.
+        # Prefer the PyTorch checkpoint here: it avoids a known NaN forward-pass
+        # failure observed with the local safetensors shard on the Kaggle image.
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            compatible_ref,
+            trust_remote_code=True,
+            local_files_only=True,
+            use_safetensors=False,
+            torch_dtype=torch.float32,
+        )
+        bad_parameters = [
+            name for name, parameter in model.named_parameters()
+            if not torch.isfinite(parameter.detach()).all()
+        ]
+        if bad_parameters:
+            preview = ", ".join(bad_parameters[:5])
+            raise RuntimeError(f"Local model contains non-finite weights: {preview}")
         log("Model loaded successfully from local disk.")
         return tokenizer, model
 
