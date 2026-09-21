@@ -1,4 +1,4 @@
-version: 1
+version: 2
 project: santali-ai
 policy:
   default_training_eligible: false
@@ -11,6 +11,7 @@ policy:
   exclude_unknown_license: true
   exclude_evaluation_only: true
   exclude_restricted_audio_from_kaggle: true
+  public_release_requires_explicit_redistribution: true
 sources:
   - id: santali-wordlist-cc0
     name: Santali Ol Chiki Word List
@@ -24,24 +25,71 @@ sources:
     license_url: https://creativecommons.org/publicdomain/zero/1.0/
     attribution: "Foundational Language Tech / O Foundation, Santali Word list (2021); repository code is MPL-2.0. Use only the confirmed CC0 word-list files."
     status: approved
+    use_class: trainable
     training_use: allowed
     redistribution: allowed
     scripts: [Ol_Chiki]
     languages: [sat]
-    notes: "Approved for the word-list artifact only. Do not include repository code, sat.aff, or unverified upstream files."
-  - id: ai4bharat-bpcc-sat
-    name: AI4Bharat BPCC Santali slice
+    notes: "Approved for the word-list artifact only."
+  - id: mmloso-santali-2025
+    name: MMLoSo 2025 English-Santali parallel data
     kind: parallel_text
-    source_url: https://huggingface.co/datasets/ai4bharat/BPCC
-    license: CC0-1.0-packaging
-    license_url: https://huggingface.co/datasets/ai4bharat/BPCC
-    attribution: "AI4Bharat BPCC; preserve component-level provenance and the extracted-text rights notice."
+    source_url: https://www.kaggle.com/competitions/mmloso2025/data
+    source_version: mmloso2025-santali-train.csv
+    artifact_path: data/raw/mmloso-2025/santali-train.csv
+    artifact_sha256: e044d53ebc4913ecbecbf1f9d5cba04b8f1a6e0f81192722b9b3ded0fe73b16c
+    license: competition_rules
+    license_url: https://www.kaggle.com/competitions/mmloso2025/rules
+    attribution: "MMLoSo 2025 English-Santali shared task; retain the competition attribution and notices."
+    status: approved_private
+    use_class: private_training_only
+    training_use: allowed
+    redistribution: allowed_private_only
+    scripts: [Ol_Chiki]
+    languages: [en, sat]
+    notes: "Private baseline only. Do not re-host, publish raw files, or release a derivative without organizer permission and current-rules review."
+  - id: santaliconnect
+    name: SantaliConnect tribal agriculture and health QA
+    kind: instruction_parallel_text
+    source_url: https://www.kaggle.com/datasets/adarsh2626/santaliconnect-tribal-agri-and-health-qa
+    license: CC-BY-SA-4.0
+    license_url: https://creativecommons.org/licenses/by-sa/4.0/
+    attribution: "SantaliConnect dataset by Adarsh Kumar; preserve source attribution and ShareAlike notice."
     status: candidate
-    training_use: needs_component_review
-    redistribution: needs_component_review
-    scripts: [Ol_Chiki, Devanagari, Bengali, Latin]
-    languages: [sat, hi, bn]
-    notes: "Corpus-wide totals are not Santali counts. Filter sat/sat_Olck rows only and audit each component/upstream source."
+    use_class: trainable_after_audit
+    training_use: needs_native_review
+    redistribution: conditional_share_alike
+    scripts: [Ol_Chiki]
+    languages: [en, sat]
+    notes: "AI-generated/enriched rows reported; validate with native speakers before training."
+  - id: santali-agriculture-qa-506
+    name: Santali Ol Chiki Agriculture Question-Answer
+    kind: instruction_text
+    source_url: https://www.kaggle.com/datasets/nharshavardhana/santali-ol-chiki-agriculture-question-answer
+    license: CC-BY-4.0
+    license_url: https://creativecommons.org/licenses/by/4.0/
+    attribution: "Santali Ol Chiki Agriculture Question-Answer dataset; preserve the dataset card and upstream Vikaspedia attribution."
+    status: candidate
+    use_class: trainable_after_audit
+    training_use: needs_upstream_review
+    redistribution: conditional_attribution
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "506-row seed; verify upstream rights and factuality."
+  - id: google-smol-santali
+    name: Google SMOL multilingual translation data Santali slice
+    kind: parallel_text
+    source_url: https://huggingface.co/datasets/google/smol
+    license: CC-BY-4.0
+    license_url: https://creativecommons.org/licenses/by/4.0/
+    attribution: "Google Research SMOL; include attribution and change notice."
+    status: candidate
+    use_class: trainable_after_audit
+    training_use: needs_file_audit
+    redistribution: conditional_attribution
+    scripts: [Ol_Chiki, Latin]
+    languages: [en, sat]
+    notes: "Use only exact released Santali files after counting and schema/license audit."
   - id: common-voice-santali
     name: Mozilla Common Voice Santali scripted speech
     kind: speech
@@ -50,40 +98,68 @@ sources:
     license_url: https://commonvoice.mozilla.org/en/datasets
     attribution: "Mozilla Common Voice; preserve release version, datasheet and contributor restrictions."
     status: restricted_rehosting
+    use_class: manual_review
     training_use: review_release
     redistribution: not_allowed_by_default
     scripts: [Ol_Chiki]
     languages: [sat]
-    notes: "Use only in a controlled local workflow until re-hosting on Kaggle is explicitly cleared. Do not identify speakers."
-  - id: smol-santali
-    name: Google SMOL multilingual translation data
-    kind: parallel_text
-    source_url: https://huggingface.co/datasets/google/smol
+    notes: "Controlled local workflow until current release and Kaggle re-hosting terms are verified."
+  - id: indic-dialect-asr-santali
+    name: Indic dialect ASR Santali subset
+    kind: speech
+    source_url: https://huggingface.co/datasets/grushaaaaa/indic-dialect-asr
     license: CC-BY-4.0
-    license_url: https://creativecommons.org/licenses/by/4.0/
-    attribution: "Google Research SMOL; include attribution and change notice."
+    license_url: https://huggingface.co/datasets/grushaaaaa/indic-dialect-asr
+    attribution: "Indic dialect ASR dataset; preserve dataset card and original source fields."
     status: candidate
-    training_use: needs_release_audit
-    redistribution: needs_release_audit
+    use_class: manual_review
+    training_use: needs_provenance_audit
+    redistribution: conditional_attribution
+    scripts: [Ol_Chiki, Latin]
+    languages: [sat]
+    notes: "User-uploaded/converted collection; audit transcripts, speaker overlap and upstream terms."
+  - id: ai4bharat-rasa
+    name: AI4Bharat Rasa Santali speech
+    kind: speech
+    source_url: https://huggingface.co/datasets/ai4bharat/Rasa
+    license: CC-BY-4.0
+    license_url: https://huggingface.co/datasets/ai4bharat/Rasa
+    attribution: "AI4Bharat Rasa; preserve dataset card, speaker consent and attribution."
+    status: gated_manual_permission
+    use_class: manual_review
+    training_use: permission_required
+    redistribution: permission_required
     scripts: [Ol_Chiki]
-    languages: [sat, en]
-    notes: "Use only the exact released Santali files after counting and checking the dataset card."
-  - id: mmloso-santali-2025
-    name: MMLoSo 2025 English-Santali parallel data
+    languages: [sat]
+    notes: "Gated contact-information access; no voice derivative or public mirror before consent review."
+  - id: ai4bharat-indicvoices
+    name: AI4Bharat IndicVoices Santali configuration
+    kind: speech
+    source_url: https://huggingface.co/datasets/ai4bharat/IndicVoices
+    license: CC-BY-4.0
+    license_url: https://huggingface.co/datasets/ai4bharat/IndicVoices
+    attribution: "AI4Bharat IndicVoices; preserve speaker and release metadata."
+    status: gated_manual_permission
+    use_class: manual_review
+    training_use: permission_required
+    redistribution: permission_required
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "Verify Santali-specific scale, speaker IDs, transcript quality and consent."
+  - id: ai4bharat-bpcc-sat
+    name: AI4Bharat BPCC Santali slice
     kind: parallel_text
-    source_url: https://www.kaggle.com/competitions/mmloso2025/data
-    source_version: mmloso2025-santali-train.csv
-    artifact_path: data/raw/mmloso-2025/santali-train.csv
-    artifact_sha256: e044d53ebc4913ecbecbf1f9d5cba04b8f1a6e0f81192722b9b3ded0fe73b16c
-    license: CC-BY-SA-4.0
-    license_url: https://creativecommons.org/licenses/by-sa/4.0/
-    attribution: "MMLoSo 2025 English-Santali shared task; retain attribution and share-alike notices from the exact release."
-    status: approved
-    training_use: allowed
-    redistribution: allowed
-    scripts: [Ol_Chiki]
-    languages: [en, sat]
-    notes: "Verified uploaded artifact: 20,000 data rows, English and Santali columns, Ol Chiki targets. Preserve CC BY-SA attribution and share-alike notice in every derived package."
+    source_url: https://huggingface.co/datasets/ai4bharat/BPCC
+    license: component_review_required
+    license_url: https://huggingface.co/datasets/ai4bharat/BPCC
+    attribution: "AI4Bharat BPCC; preserve component-level provenance and rights notices."
+    status: candidate
+    use_class: manual_review
+    training_use: needs_component_review
+    redistribution: needs_component_review
+    scripts: [Ol_Chiki, Devanagari, Bengali, Latin]
+    languages: [sat, hi, bn]
+    notes: "Filter Santali rows and audit each upstream component before use."
   - id: flores-in-sat
     name: IndicGenBench FLORES-IN Santali evaluation
     kind: evaluation
@@ -92,11 +168,26 @@ sources:
     license_url: https://creativecommons.org/licenses/by-sa/4.0/
     attribution: "Google Research IndicGenBench FLORES-IN."
     status: evaluation_only
+    use_class: eval_only
     training_use: prohibited
     redistribution: evaluation_only
     scripts: [Ol_Chiki]
     languages: [sat]
-    notes: "Keep fully held out; the dataset card prohibits use in training corpora."
+    notes: "Held out permanently; do not mix with training."
+  - id: in22-sat
+    name: IN22 Santali evaluation material
+    kind: evaluation
+    source_url: https://github.com/google-research/indic-gen-bench
+    license: benchmark_terms
+    license_url: https://github.com/google-research/indic-gen-bench
+    attribution: "IN22 benchmark creators; follow benchmark terms."
+    status: evaluation_only
+    use_class: eval_only
+    training_use: prohibited
+    redistribution: evaluation_only
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "Evaluation-only benchmark material."
   - id: mod4-current
     name: Current English-Santali Mod4 copy
     kind: parallel_text
@@ -105,8 +196,23 @@ sources:
     license_url: https://huggingface.co/datasets/aiswarya9302/english-santali-datasetmod4
     attribution: "Source license not stated."
     status: excluded_unknown_license
+    use_class: restricted
     training_use: prohibited_until_cleared
     redistribution: prohibited_until_cleared
     scripts: [Ol_Chiki]
     languages: [en, sat]
-    notes: "The existing 63,179-pair experiment must not be republished or mixed into the licensed corpus until the source license is confirmed."
+    notes: "Do not publish or merge into an open corpus until the original license is confirmed."
+  - id: flores-plus
+    name: FLORES Plus held-out evaluation
+    kind: evaluation
+    source_url: https://huggingface.co/datasets/openlanguagedata/flores_plus
+    license: CC-BY-SA-4.0
+    license_url: https://creativecommons.org/licenses/by-sa/4.0/
+    attribution: "FLORES Plus dataset creators."
+    status: evaluation_only
+    use_class: eval_only
+    training_use: prohibited
+    redistribution: evaluation_only
+    scripts: [Ol_Chiki]
+    languages: [sat]
+    notes: "Never include in training."

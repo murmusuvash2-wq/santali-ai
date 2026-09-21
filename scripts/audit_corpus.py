@@ -56,10 +56,10 @@ def main() -> None:
         license_name = str(source.get("license", "")).strip().lower()
         status = str(source.get("status", "")).strip()
         eligible = (
-            status == "approved"
+            status in {"approved", "approved_private"}
             and license_name not in {"", "unknown", "proprietary"}
             and source.get("training_use") == "allowed"
-            and source.get("redistribution") == "allowed"
+            and source.get("redistribution") in {"allowed", "allowed_private_only"}
             and bool(source.get("source_url"))
             and bool(source.get("artifact_sha256"))
         )
@@ -88,6 +88,7 @@ def main() -> None:
             "attribution": source.get("attribution", ""),
             "artifact_path": artifact_path or source.get("artifact_path", ""),
             "artifact_sha256": artifact_hash,
+            "use_class": source.get("use_class", ""),
             "training_use": source.get("training_use", ""),
             "redistribution": source.get("redistribution", ""),
             "languages": ",".join(source.get("languages", [])),

@@ -9,3 +9,6 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m compileall scripts training src
+      - run: pip install pyyaml
+      - run: python scripts/validate_source_registry.py
+      - run: python scripts/audit_corpus.py --output-dir .corpus-audit
