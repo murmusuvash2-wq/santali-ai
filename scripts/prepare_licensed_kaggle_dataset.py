@@ -49,10 +49,10 @@ def main() -> None:
     registry: dict[str, Any] = yaml.safe_load(Path(args.manifest).read_text(encoding="utf-8"))
     candidates = [
         source for source in registry.get("sources", [])
-        if source.get("status") == "approved"
+        if source.get("status") in {"approved", "approved_private"}
         and source.get("kind") == "parallel_text"
         and source.get("training_use") == "allowed"
-        and source.get("redistribution") == "allowed"
+        and source.get("redistribution") in {"allowed", "allowed_private_only"}
     ]
     if not candidates:
         raise SystemExit("No approved parallel_text source is registered; refusing to build Kaggle data.")
@@ -112,7 +112,7 @@ def main() -> None:
     metadata = {
         "title": "Santali AI Licensed Parallel Corpus",
         "id": "janaiworkspace/approved-parallel",
-        "licenses": [{"name": "CC-BY-SA-4.0"}],
+        "licenses": [{"name": s["license"]} for s in used_sources],
         "description": "Only explicitly approved, hashed parallel sources are included.",
         "rows": len(rows),
         "sources": used_sources,
