@@ -31,8 +31,8 @@ jobs:
       KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HUGGING_FACE_HUB_TOKEN: ${{ secrets.HF_TOKEN }}
-      HF_MODEL_ID: ai4bharat/indictrans2-indic-indic-dist-320M
-      KAGGLE_MODEL_DATASET: janaiworkspace/indictrans2-320m
+      HF_MODEL_ID: ai4bharat/indictrans2-en-indic-dist-200M
+      KAGGLE_MODEL_DATASET: janaiworkspace/indictrans2-en-indic-200m
 
     steps:
       - name: Checkout repository
@@ -119,7 +119,7 @@ jobs:
           login(token=token, add_to_git_credential=False)
           snapshot_download(repo_id=os.environ["HF_MODEL_ID"], local_dir=".kaggle-model", token=token)
           Path(".kaggle-model/dataset-metadata.json").write_text(json.dumps({
-              "title": "IndicTrans2 320M Indic Indic",
+              "title": "IndicTrans2 En-Indic 200M",
               "id": os.environ["KAGGLE_MODEL_DATASET"],
               "licenses": [{"name": "MIT"}]
           }, indent=2))
@@ -165,7 +165,7 @@ jobs:
           from pathlib import Path
           p = Path("kaggle/kernel/kernel-metadata.json")
           m = json.loads(p.read_text())
-          m["dataset_sources"] = ["janaiworkspace/approved-parallel", "janaiworkspace/indictrans2-320m"]
+          m["dataset_sources"] = ["janaiworkspace/approved-parallel", "janaiworkspace/indictrans2-en-indic-200m"]
           m["enable_gpu"] = True
           m["enable_internet"] = True
           p.write_text(json.dumps(m, indent=2) + "\n")

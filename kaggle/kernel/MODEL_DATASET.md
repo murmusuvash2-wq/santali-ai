@@ -7,7 +7,7 @@ Upload the model once as a Kaggle dataset and the kernel will use it automatical
 
 ```bash
 pip install -U huggingface_hub
-huggingface-cli download ai4bharat/indictrans2-indic-indic-dist-320M --local-dir ./indictrans2-320m
+huggingface-cli download ai4bharat/indictrans2-en-indic-dist-200M --local-dir ./indictrans2-en-indic-200m
 ```
 
 Folder must contain at least:
@@ -17,7 +17,7 @@ Folder must contain at least:
 
 ## 2. Create Kaggle dataset
 
-- Name suggestion: `indictrans2-320m` (owner: `janaiworkspace`)
+- Name suggestion: `indictrans2-en-indic-200m` (owner: `janaiworkspace`)
 - Upload the folder contents
 - Keep private or public
 
@@ -25,7 +25,7 @@ Folder must contain at least:
 
 On https://www.kaggle.com/code/janaiworkspace/santali-ai-translation
 
-1. **Add Input** → your dataset `indictrans2-320m`
+1. **Add Input** → your dataset `indictrans2-en-indic-200m`
 2. Re-run
 
 ## 4. What the script does
@@ -33,17 +33,17 @@ On https://www.kaggle.com/code/janaiworkspace/santali-ai-translation
 Load order:
 
 1. `MODEL_PATH` environment variable (if set)
-2. `/kaggle/input/indictrans2-320m`
+2. `/kaggle/input/indictrans2-en-indic-200m`
 3. `/kaggle/input/indictrans2-indic-indic-dist-320m`
-4. `/kaggle/input/ai4bharat-indictrans2-320m`
+4. `/kaggle/input/ai4bharat-indictrans2-en-indic-200m`
 5. `/kaggle/input/indictrans2`
 6. Any other `/kaggle/input/**/config.json` with weights
-7. **Else** HuggingFace: `ai4bharat/indictrans2-indic-indic-dist-320M`
+7. **Else** HuggingFace: `ai4bharat/indictrans2-en-indic-dist-200M`
 
 Log line you want to see:
 
 ```
-Using LOCAL model: /kaggle/input/indictrans2-320m
+Using LOCAL model: /kaggle/input/indictrans2-en-indic-200m
 ```
 
 or

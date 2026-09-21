@@ -27,7 +27,7 @@ OUT = Path("/kaggle/working/santali-output")
 DATA_DIR = OUT / "data"
 ADAPTER_DIR = OUT / "adapter"
 HF_MODEL_ID = os.environ.get(
-    "MODEL_ID", "ai4bharat/indictrans2-indic-indic-dist-320M"
+    "MODEL_ID", "ai4bharat/indictrans2-en-indic-dist-200M"
 )
 SRC_LANG = "eng_Latn"
 TGT_LANG = "sat_Olck"
@@ -45,9 +45,9 @@ CRITICAL_PKGS = [
 
 LOCAL_MODEL_CANDIDATES = [
     os.environ.get("MODEL_PATH", "").strip(),
-    "/kaggle/input/indictrans2-320m",
+    "/kaggle/input/indictrans2-en-indic-200m",
     "/kaggle/input/indictrans2-indic-indic-dist-320m",
-    "/kaggle/input/ai4bharat-indictrans2-320m",
+    "/kaggle/input/ai4bharat-indictrans2-en-indic-200m",
     "/kaggle/input/indictrans2",
 ]
 
@@ -186,7 +186,7 @@ def resolve_model_source() -> str:
                 return str(parent)
 
     log(f"No local model under /kaggle/input — HF id: {HF_MODEL_ID}")
-    log("Attach dataset janaiworkspace/indictrans2-320m to avoid network dependency.")
+    log("Attach dataset janaiworkspace/indictrans2-en-indic-200m to avoid network dependency.")
     return HF_MODEL_ID
 
 
@@ -202,7 +202,7 @@ def network_ok(host: str = "huggingface.co", port: int = 443, timeout: float = 3
 def patch_local_model_for_transformers(model_ref: str) -> str:
     """Use symlinked weights with a tiny source-only compatibility patch."""
     import shutil
-    patched = Path("/kaggle/working/indictrans2-320m-patched")
+    patched = Path("/kaggle/working/indictrans2-en-indic-200m-patched")
     if patched.exists():
         return str(patched)
     shutil.copytree(model_ref, patched, symlinks=True)
@@ -269,8 +269,8 @@ def load_tokenizer_and_model(model_ref: str):
         raise RuntimeError(
             "No local model attached and huggingface.co is unreachable (DNS/network).\n"
             "Do NOT wait — fix one of these:\n"
-            "  1) Run GitHub Actions with HF_TOKEN so janaiworkspace/indictrans2-320m is uploaded\n"
-            "  2) Kernel → Add Input → dataset janaiworkspace/indictrans2-320m\n"
+            "  1) Run GitHub Actions with HF_TOKEN so janaiworkspace/indictrans2-en-indic-200m is uploaded\n"
+            "  2) Kernel → Add Input → dataset janaiworkspace/indictrans2-en-indic-200m\n"
             "  3) Settings → Internet ON, then re-run when Kaggle DNS works\n"
             f"  Current /kaggle/input: {list(Path('/kaggle/input').iterdir()) if Path('/kaggle/input').exists() else []}"
         )
@@ -290,7 +290,7 @@ def load_tokenizer_and_model(model_ref: str):
 
     raise RuntimeError(
         f"Failed to load model {model_ref!r}.\nLast error: {last_err}\n"
-        "Prefer attaching local dataset janaiworkspace/indictrans2-320m."
+        "Prefer attaching local dataset janaiworkspace/indictrans2-en-indic-200m."
     ) from last_err
 
 

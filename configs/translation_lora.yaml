@@ -1,5 +1,5 @@
-base_model: ai4bharat/indictrans2-indic-indic-dist-320M
-source_lang: hin_Deva
+base_model: ai4bharat/indictrans2-en-indic-dist-200M
+source_lang: eng_Latn
 target_lang: sat_Olck
 max_source_length: 128
 max_target_length: 128

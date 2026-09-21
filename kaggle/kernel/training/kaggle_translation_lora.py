@@ -22,8 +22,8 @@ from transformers import (
 )
 from peft import LoraConfig, TaskType, get_peft_model
 
-DEFAULT_MODEL = "ai4bharat/indictrans2-indic-indic-dist-320M"
-DEFAULT_SRC = "hin_Deva"
+DEFAULT_MODEL = "ai4bharat/indictrans2-en-indic-dist-200M"
+DEFAULT_SRC = "eng_Latn"
 DEFAULT_TGT = "sat_Olck"
 
 

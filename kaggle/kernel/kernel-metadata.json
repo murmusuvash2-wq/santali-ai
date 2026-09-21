@@ -10,7 +10,7 @@
   "machine_shape": "NvidiaTeslaT4",
   "dataset_sources": [
     "janaiworkspace/approved-parallel",
-    "janaiworkspace/indictrans2-320m"
+    "janaiworkspace/indictrans2-en-indic-200m"
   ],
   "competition_sources": [],
   "kernel_sources": [],

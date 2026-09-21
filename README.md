@@ -20,10 +20,10 @@ The current pipeline prepares an approved English–Santali parallel corpus, upl
 |---|---|
 | Live project dashboard | [Open dashboard](https://santali-ai-dashboard.vercel.app) |
 | Training platform | Kaggle GPU |
-| Base model | `ai4bharat/indictrans2-indic-indic-dist-320M` |
+| Base model | `ai4bharat/indictrans2-en-indic-dist-200M` |
 | Translation direction | English → Santali (`eng_Latn` → `sat_Olck`) |
 | Training method | LoRA adapter fine-tuning |
-| Parallel corpus | 63,179 approved English–Santali pairs |
+| Parallel corpus | 19,869 approved English–Santali pairs |
 | Dataset visibility | Private while provenance is reviewed |
 | Kernel | [janaiworkspace/santali-ai-translation](https://www.kaggle.com/code/janaiworkspace/santali-ai-translation) |
 
