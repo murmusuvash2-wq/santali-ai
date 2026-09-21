@@ -528,6 +528,18 @@ def train_lora(data_dir: Path) -> None:
         log(f"Preflight wrapper logits: finite_ratio={finite_ratio:.6f}")
         base = model.get_base_model()
         base_inputs = {key: value for key, value in sanity_inputs.items() if key != "labels"}
+        if "decoder_input_ids" not in base_inputs:
+            base_config = base.config
+            base_pad = base_config.pad_token_id or 0
+            base_start = base_config.decoder_start_token_id
+            if base_start is None:
+                base_start = base_pad
+            base_labels = sanity_inputs["labels"]
+            base_decoder = base_labels.new_full(base_labels.shape, base_pad)
+            base_decoder[:, 1:] = base_labels[:, :-1].clone()
+            base_decoder[:, 0] = base_start
+            base_decoder.masked_fill_(base_decoder == -100, base_pad)
+            base_inputs["decoder_input_ids"] = base_decoder
         with torch.no_grad():
             base_outputs = base(**base_inputs)
         base_ratio = torch.isfinite(base_outputs.logits).float().mean().item()
