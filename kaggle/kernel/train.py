@@ -209,29 +209,25 @@ def patch_local_model_for_transformers(model_ref: str) -> str:
     modeling = patched / "modeling_indictrans.py"
     if modeling.exists():
         source = modeling.read_text(encoding="utf-8")
+        # The checkpoint contains both embedding and lm_head weights. Newer
+        # Transformers invokes the old IndicTrans2 tie_weights hook during
+        # loading; its removed helper can also tie the two matrices in the
+        # wrong direction and produce NaN logits. Preserve the checkpoint as
+        # stored and make this legacy hook a no-op for local inference/training.
         updated = re.sub(
-            r"def tie_weights\(self(?:, [^)]*)?\):",
-            "def tie_weights(self, *args, **kwargs):",
+            r"    def tie_weights\(self(?:, [^)]*)?\):\n(?:        .*\n)+?(?=    def |\Z)",
+            "    def tie_weights(self, *args, **kwargs):\n        return\n\n",
             source,
             count=1,
         )
-        # Newer Transformers removed this helper from PreTrainedModel, while
-        # IndicTrans2's custom implementation still calls it from tie_weights.
-        compat_method = """    def _tie_or_clone_weights(self, output_embeddings, input_embeddings):
-        output_embeddings.weight = input_embeddings.weight
-        if hasattr(output_embeddings, \"out_features\") and hasattr(input_embeddings, \"num_embeddings\"):
-            output_embeddings.out_features = input_embeddings.num_embeddings
-
-"""
-        updated = re.sub(
-            r"    def tie_weights\(",
-            compat_method + "    def tie_weights(",
-            updated,
-            count=1,
-        )
+        config_path = patched / "config.json"
+        if config_path.exists():
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["tie_word_embeddings"] = False
+            config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
         if updated != source:
             modeling.write_text(updated, encoding="utf-8")
-            log("  patched IndicTrans2 tie_weights compatibility for local loader")
+            log("  disabled legacy IndicTrans2 weight tying for local loader")
     return str(patched)
 
 
