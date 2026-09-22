@@ -18,11 +18,11 @@ Record each dataset's URL, license, access condition, language, script, size, pr
 
 ### M1 — Online-data baseline
 
-Use approved public data to create a small Hindi–Santali and English–Santali baseline. Run the tokenizer audit and numerical finite-logit preflight before fine-tuning. Normalize Unicode, identify scripts, remove duplicates and split by source. Run the existing IndicTrans2 model before fine-tuning so improvement is measurable.
+Use the current verified English–Santali and Santali Ol Chiki corpus first; do not wait for a perfect or much larger corpus. Run the tokenizer audit and numerical finite-logit preflight before fine-tuning. Normalize Unicode, identify scripts, remove duplicates and split by source. Build traceable target-side denoising and word-reconstruction variants from the same rows, then run the existing IndicTrans2 model before fine-tuning so improvement is measurable.
 
 ### M2 — Kaggle translation fine-tuning
 
-Fine-tune the `ai4bharat/indictrans2-en-indic-dist-200M` IndicTrans2 checkpoint with a small learning rate. Start with a controlled subset only after tokenizer, encoder, decoder, `lm_head`, and initial-loss checks are finite. Save the tokenizer, adapter/checkpoint, configuration, dataset manifest and metrics as one versioned experiment.
+Fine-tune the `ai4bharat/indictrans2-en-indic-dist-200M` IndicTrans2 checkpoint with a small learning rate and a controlled curriculum over the current verified rows: primary English–Santali translation, then carefully weighted Ol Chiki reconstruction/denoising and reverse-direction tasks. Start only after tokenizer, encoder, decoder, `lm_head`, and initial-loss checks are finite. Save the tokenizer, adapter/checkpoint, configuration, derived-data lineage, dataset manifest and metrics as one versioned experiment.
 
 ### M3 — Native evaluation
 

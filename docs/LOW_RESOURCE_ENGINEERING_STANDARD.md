@@ -9,6 +9,14 @@ Santali is a low-resource language and Ol Chiki is not a high-resource script wi
 
 This document is the default engineering contract. Contributors should not need to rediscover or re-explain these requirements in every issue, pull request, or training run.
 
+## Existing verified data comes first
+
+The project must not assume that a low-resource language has no usable data merely because the model learns poorly from the first experiment. Existing verified English–Santali and Santali Ol Chiki data is the starting asset. The immediate problem may be representation, tokenizer fragmentation, task design, split quality, curriculum, or optimization rather than data absence.
+
+Do not wait for a perfect corpus before learning from the available verified data. First improve how the same data is presented: clean target-side Ol Chiki examples, controlled denoising and word-reconstruction variants, explicit language/script tags, and carefully weighted translation directions. Keep every derived variant traceable to its original row. Synthetic Hindi/Bengali expansion is auxiliary and must not replace verified Santali targets or dilute the primary corpus.
+
+“Verified” means accepted by the source and quality gates; it does not mean every row is guaranteed error-free. Small residual errors should be measured and corrected where possible, not used as a reason to discard the whole low-resource corpus.
+
 ## Mandatory pre-training gates
 
 No fine-tuning run may start until all of the following are checked and recorded:
