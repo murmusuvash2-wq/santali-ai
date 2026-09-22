@@ -94,6 +94,7 @@ The dataset is **not being redistributed publicly** until the original provenanc
 │   └── architecture.mmd
 ├── docs/
 │   ├── PLAN.md
+│   ├── POST_TRAINING_VALIDATION_PLAN.md
 │   ├── DATA_POLICY.md
 │   ├── DATA_SOURCE_REVIEW.md
 │   ├── EVALUATION.md
@@ -149,6 +150,19 @@ The GitHub Actions workflow handles the repeatable parts:
 8. Save the LoRA adapter and evaluation artifacts.
 
 Run it manually from **GitHub → Actions → Kaggle training → Run workflow**. Required repository secrets are `KAGGLE_API_TOKEN` and `HF_TOKEN`; Telegram notification is optional.
+
+## What happens after a successful training run?
+
+Training completion is not the same as translation quality approval. The next steps are documented in the [Post-Training Validation and Integration Plan](docs/POST_TRAINING_VALIDATION_PLAN.md):
+
+1. Audit tokenizer fragmentation and Ol Chiki coverage.
+2. Evaluate held-out translations from the base and LoRA models.
+3. Benchmark the same test set against NLLB-200.
+4. Validate approved datasets, rights, deduplication and mixed-language routing.
+5. Decide whether another fine-tuning run is needed.
+6. Begin internal-only Gemma–IndicTrans bridge testing after the quality gates pass.
+
+The current successful Kaggle run is therefore treated as a **validated training artifact candidate**, not as an automatic public release.
 
 ## Quality and release gates
 
