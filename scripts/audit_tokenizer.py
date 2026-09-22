@@ -10,6 +10,8 @@ import csv
 import json
 import math
 import re
+import sys
+import types
 import unicodedata
 from pathlib import Path
 from statistics import mean, median
@@ -17,6 +19,40 @@ from statistics import mean, median
 OL_CHIKI = re.compile(r"[\u1C50-\u1C7F]")
 DEVANAGARI = re.compile(r"[\u0900-\u097F]")
 BENGALI = re.compile(r"[\u0980-\u09FF]")
+
+
+def install_transformers_onnx_shim() -> None:
+    """Support IndicTrans2 custom code on Transformers builds without onnx."""
+    try:
+        import transformers.onnx  # type: ignore[attr-defined]
+        return
+    except Exception:
+        pass
+    module = types.ModuleType("transformers.onnx")
+    module.__path__ = []
+
+    class OnnxConfig:
+        default_fixed_batch = 2
+        default_fixed_sequence = 8
+
+    class OnnxSeq2SeqConfigWithPast(OnnxConfig):
+        use_past = False
+
+        def fill_with_past_key_values_(self, inputs, direction="inputs"):
+            return inputs
+
+    module.OnnxConfig = OnnxConfig
+    module.OnnxSeq2SeqConfigWithPast = OnnxSeq2SeqConfigWithPast
+    sys.modules["transformers.onnx"] = module
+    utils = types.ModuleType("transformers.onnx.utils")
+
+    def compute_effective_axis_dimension(dimension, fixed_dimension, num_token_to_add=0):
+        if dimension is None or dimension < 0:
+            return fixed_dimension + num_token_to_add
+        return dimension + num_token_to_add
+
+    utils.compute_effective_axis_dimension = compute_effective_axis_dimension
+    sys.modules["transformers.onnx.utils"] = utils
 
 
 def nonspace_chars(text: str) -> int:
@@ -134,6 +170,7 @@ def main() -> None:
     parser.add_argument("--max-length", type=int, default=128)
     args = parser.parse_args()
 
+    install_transformers_onnx_shim()
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     pairs = read_pairs(args.input, args.limit)
