@@ -10,6 +10,7 @@ import csv
 import json
 import math
 import re
+import shutil
 import sys
 import types
 import unicodedata
@@ -53,6 +54,24 @@ def install_transformers_onnx_shim() -> None:
 
     utils.compute_effective_axis_dimension = compute_effective_axis_dimension
     sys.modules["transformers.onnx.utils"] = utils
+
+
+def prepare_compatible_tokenizer_ref(model_ref: str) -> str:
+    """Patch only the audit copy for legacy IndicTrans tokenizer initialization."""
+    source_ref = Path(model_ref)
+    if not source_ref.is_dir():
+        return model_ref
+    patched_ref = source_ref.parent / f"{source_ref.name}-tokenizer-patched"
+    if not patched_ref.exists():
+        shutil.copytree(source_ref, patched_ref)
+    tokenizer_source = patched_ref / "tokenization_indictrans.py"
+    if tokenizer_source.exists():
+        source = tokenizer_source.read_text(encoding="utf-8")
+        marker = "        self._special_tokens_map = {}\n        self.unk_token = ("
+        if "self._special_tokens_map = {}" not in source and "        self.unk_token = (" in source:
+            source = source.replace("        self.unk_token = (", marker, 1)
+            tokenizer_source.write_text(source, encoding="utf-8")
+    return str(patched_ref)
 
 
 def nonspace_chars(text: str) -> int:
@@ -172,7 +191,8 @@ def main() -> None:
 
     install_transformers_onnx_shim()
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    tokenizer_ref = prepare_compatible_tokenizer_ref(args.model)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_ref, trust_remote_code=True)
     pairs = read_pairs(args.input, args.limit)
     english = [p["english"] for p in pairs]
     santali = [p["santali"] for p in pairs]
@@ -184,6 +204,7 @@ def main() -> None:
     ]
     result = {
         "model": args.model,
+        "tokenizer_model_ref": tokenizer_ref,
         "input": str(args.input),
         "max_length": args.max_length,
         "tokenizer_class": tokenizer.__class__.__name__,
