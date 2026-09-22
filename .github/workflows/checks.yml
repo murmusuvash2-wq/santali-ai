@@ -12,3 +12,11 @@ jobs:
       - run: pip install pyyaml
       - run: python scripts/validate_source_registry.py
       - run: python scripts/audit_corpus.py --output-dir .corpus-audit
+      - name: Verify low-resource project standard
+        run: |
+          test -s CONTRIBUTING.md
+          test -s docs/LOW_RESOURCE_ENGINEERING_STANDARD.md
+          test -s docs/POST_TRAINING_VALIDATION_PLAN.md
+          grep -q "Tokenizer" docs/LOW_RESOURCE_ENGINEERING_STANDARD.md
+          grep -q "Numerical preflight" docs/LOW_RESOURCE_ENGINEERING_STANDARD.md
+          grep -q "native Santali" docs/LOW_RESOURCE_ENGINEERING_STANDARD.md

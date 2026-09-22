@@ -84,6 +84,7 @@ The dataset is **not being redistributed publicly** until the original provenanc
 ```text
 .
 ├── README.md
+├── CONTRIBUTING.md
 ├── LICENSE
 ├── CITATION.cff
 ├── configs/
@@ -94,6 +95,7 @@ The dataset is **not being redistributed publicly** until the original provenanc
 │   └── architecture.mmd
 ├── docs/
 │   ├── PLAN.md
+│   ├── LOW_RESOURCE_ENGINEERING_STANDARD.md
 │   ├── POST_TRAINING_VALIDATION_PLAN.md
 │   ├── DATA_POLICY.md
 │   ├── DATA_SOURCE_REVIEW.md
@@ -151,6 +153,10 @@ The GitHub Actions workflow handles the repeatable parts:
 
 Run it manually from **GitHub → Actions → Kaggle training → Run workflow**. Required repository secrets are `KAGGLE_API_TOKEN` and `HF_TOKEN`; Telegram notification is optional.
 
+## Low-resource Santali standard
+
+This project does not treat Santali like a high-resource translation task. The mandatory engineering standard covers Ol Chiki Unicode and script validation, rights-aware data provenance, tokenizer fragmentation, mixed Santali–Hindi–Bengali routing, numerical finite-logit preflight, leakage prevention, native-speaker review, and fail-closed Kaggle/GitHub reporting. Read the [Low-Resource Santali Engineering Standard](docs/LOW_RESOURCE_ENGINEERING_STANDARD.md) before changing model, data, tokenizer, or training code. Contribution requirements are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## What happens after a successful training run?
 
 Training completion is not the same as translation quality approval. The next steps are documented in the [Post-Training Validation and Integration Plan](docs/POST_TRAINING_VALIDATION_PLAN.md):
@@ -170,7 +176,9 @@ A model will not be called production-ready until it passes all of the following
 
 - No sentence or speaker leakage between train and evaluation sets.
 - Unicode and Ol Chiki script validation.
+- Tokenizer-health audit and finite encoder/decoder/lm-head preflight.
 - BLEU and chrF reported on a held-out test set.
+- Mixed Santali, Hindi, Bengali and English stress tests.
 - Native-speaker adequacy and fluency review.
 - Safety tests for medical, agriculture, hate, privacy and unknown questions.
 - Dataset source, license, consent and transformation records.
@@ -197,7 +205,7 @@ A model will not be called production-ready until it passes all of the following
 
 ## Contributing
 
-Contributions are welcome, especially native-speaker corrections, licensed Santali text, evaluation examples, Ol Chiki normalization rules, documentation improvements and reproducible experiments. Please open an issue before adding a new dataset so that provenance and licensing can be reviewed first.
+Contributions are welcome, especially native-speaker corrections, licensed Santali text, evaluation examples, Ol Chiki normalization rules, documentation improvements and reproducible experiments. Read [CONTRIBUTING.md](CONTRIBUTING.md) and open an issue before adding a new dataset so that provenance and licensing can be reviewed first.
 
 ## License
 
