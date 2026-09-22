@@ -533,6 +533,56 @@ def train_lora(data_dir: Path) -> None:
     model.eval()
     with torch.no_grad():
         sanity_inputs = {key: value.to(model.device) for key, value in sanity_batch.items()}
+        input_ids = sanity_inputs["input_ids"]
+        attention_mask = sanity_inputs.get("attention_mask")
+        log(
+            "Preflight inputs: "
+            f"input_range=({int(input_ids.min())},{int(input_ids.max())}), "
+            f"input_shape={tuple(input_ids.shape)}, "
+            f"attention_sums={attention_mask.sum(dim=1).tolist() if attention_mask is not None else 'none'}"
+        )
+        base_for_diag = model.get_base_model()
+        decoder_ids = sanity_inputs.get("decoder_input_ids")
+        if decoder_ids is None:
+            diag_labels = sanity_inputs["labels"]
+            diag_config = base_for_diag.config
+            diag_pad = diag_config.pad_token_id or 0
+            diag_start = diag_config.decoder_start_token_id
+            if diag_start is None:
+                diag_start = diag_pad
+            decoder_ids = diag_labels.new_full(diag_labels.shape, diag_pad)
+            decoder_ids[:, 1:] = diag_labels[:, :-1].clone()
+            decoder_ids[:, 0] = diag_start
+            decoder_ids.masked_fill_(decoder_ids == -100, diag_pad)
+        sanity_inputs["decoder_input_ids"] = decoder_ids
+        log(
+            "Preflight decoder: "
+            f"range=({int(decoder_ids.min())},{int(decoder_ids.max())}), "
+            f"shape={tuple(decoder_ids.shape)}"
+        )
+        base_model_core = getattr(base_for_diag, "model", None)
+        if base_model_core is not None and hasattr(base_model_core, "encoder") and hasattr(base_model_core, "decoder"):
+            encoder_out = base_model_core.encoder(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                return_dict=True,
+            )
+            enc_ratio = torch.isfinite(encoder_out.last_hidden_state).float().mean().item()
+            log(f"Preflight encoder hidden finite_ratio={enc_ratio:.6f}")
+            decoder_out = base_model_core.decoder(
+                input_ids=decoder_ids,
+                attention_mask=None,
+                encoder_hidden_states=encoder_out.last_hidden_state,
+                encoder_attention_mask=attention_mask,
+                return_dict=True,
+            )
+            dec_ratio = torch.isfinite(decoder_out.last_hidden_state).float().mean().item()
+            log(f"Preflight decoder hidden finite_ratio={dec_ratio:.6f}")
+            lm_head = getattr(base_for_diag, "lm_head", None)
+            if lm_head is not None:
+                head_logits = lm_head(decoder_out.last_hidden_state)
+                head_ratio = torch.isfinite(head_logits).float().mean().item()
+                log(f"Preflight lm_head logits finite_ratio={head_ratio:.6f}")
         sanity_outputs = model(**sanity_inputs)
     if not torch.isfinite(sanity_outputs.logits).all():
         finite_ratio = torch.isfinite(sanity_outputs.logits).float().mean().item()
