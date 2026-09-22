@@ -216,6 +216,10 @@ jobs:
             echo "Kaggle completed but returned no output files."
             exit 1
           }
+          if grep -R -n -E 'Traceback \(most recent call last\)|RuntimeError:|ModuleNotFoundError:|CUDA out of memory|ValueError:' kaggle-output; then
+            echo "Kaggle output contains a training failure traceback."
+            exit 1
+          fi
 
       - name: Upload training artifacts
         if: ${{ always() && env.PARALLEL_TRAINING_READY == 'true' }}
