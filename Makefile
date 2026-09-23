@@ -1,6 +1,9 @@
-.PHONY: check diagram audit-corpus profile-parallel import-mmloso build-seed-corpus evaluate-predictions
+.PHONY: check diagram audit-corpus profile-parallel import-mmloso build-seed-corpus prepare-experiment evaluate-predictions test
 check:
 	python -m compileall scripts training src
+
+test:
+	python -m unittest discover -s tests -p 'test_*.py'
 
 diagram:
 	manus-render-diagram diagrams/architecture.mmd diagrams/architecture.png
@@ -19,6 +22,10 @@ import-mmloso:
 build-seed-corpus:
 	@test -n "$(INPUT)" -a -n "$(OUTPUT_DIR)" -a -n "$(MANIFEST)"
 	python scripts/build_seed_corpus.py --input "$(INPUT)" --output-dir "$(OUTPUT_DIR)" --manifest "$(MANIFEST)"
+
+prepare-experiment:
+	@test -n "$(INPUT)" -a -n "$(OUTPUT_DIR)" -a -n "$(MANIFEST)"
+	python scripts/prepare_experiment.py --input "$(INPUT)" --output-dir "$(OUTPUT_DIR)" --manifest "$(MANIFEST)"
 
 evaluate-predictions:
 	@test -n "$(REFERENCES)" -a -n "$(PREDICTIONS)" -a -n "$(TRACK)" -a -n "$(OUTPUT)"
