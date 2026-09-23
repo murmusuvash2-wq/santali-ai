@@ -11,21 +11,26 @@ on:
         required: false
         default: NvidiaTeslaT4
       skip_model_upload:
-        description: Skip model dataset upload if already on Kaggle
+        description: Upload a new model dataset version before training
         required: false
-        default: 'false'
+        default: 'true'
   push:
     branches: [main]
     paths:
       - 'training/**'
-      - 'scripts/**'
+      - 'scripts/audit_corpus.py'
+      - 'scripts/prepare_licensed_kaggle_dataset.py'
+      - 'scripts/validate_source_registry.py'
       - 'configs/**'
       - 'kaggle/**'
       - 'requirements.txt'
-      - '.github/workflows/kaggle-train.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: santali-kaggle-training
+  cancel-in-progress: false
 
 jobs:
   push-and-run-kaggle:
@@ -209,6 +214,9 @@ jobs:
           fi
           if echo "$final_status" | grep -Eq 'ERROR|FAILED'; then
             echo "Kaggle kernel failed: $final_status"
+            echo "Attempting to download failure output for diagnosis..."
+            kaggle kernels output "$KERNEL_ID" -p kaggle-output --force || true
+            find kaggle-output -maxdepth 3 -type f -printf '%p %s bytes\n' 2>/dev/null || true
             exit 1
           fi
           kaggle kernels output "$KERNEL_ID" -p kaggle-output --force
