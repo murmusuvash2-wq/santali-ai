@@ -656,8 +656,74 @@ def train_lora(data_dir: Path) -> None:
 
     log("Evaluating on test set...")
     metrics = trainer.evaluate(tokenized["test"])
-    (ADAPTER_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
-    log(json.dumps(metrics, indent=2))
+
+    def generated_predictions(active_model, split):
+        """Generate decoded predictions with the exact tokenizer/collator path."""
+        active_trainer = Seq2SeqTrainer(
+            model=active_model,
+            args=args,
+            processing_class=tokenizer,
+            data_collator=collator,
+        )
+        result = active_trainer.predict(split, metric_key_prefix="generation")
+        generated = result.predictions
+        if isinstance(generated, tuple):
+            generated = generated[0]
+        decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
+        return [unicodedata.normalize("NFC", value).strip() for value in decoded]
+
+    raw_test = ds["test"]
+    references = [unicodedata.normalize("NFC", value).strip() for value in raw_test["target"]]
+    sources = [unicodedata.normalize("NFC", value).strip() for value in raw_test["source"]]
+
+    log("Generating LoRA predictions on held-out test set...")
+    lora_predictions = generated_predictions(model, tokenized["test"])
+
+    log("Generating base-model predictions on held-out test set...")
+    base_context = getattr(model, "disable_adapter", None)
+    if base_context is None:
+        log("PEFT model has no disable_adapter context; base comparison skipped")
+        base_predictions = [""] * len(references)
+    else:
+        with model.disable_adapter():
+            base_predictions = generated_predictions(model, tokenized["test"])
+
+    def metric_bundle(predictions):
+        import sacrebleu
+        bleu = sacrebleu.corpus_bleu(predictions, [references])
+        chrf = sacrebleu.corpus_chrf(predictions, [references])
+        return {
+            "bleu": float(bleu.score),
+            "chrf": float(chrf.score),
+            "prediction_olchiki_rate": sum(bool(OL_CHIKI.search(p)) for p in predictions) / max(1, len(predictions)),
+            "empty_prediction_rate": sum(not p for p in predictions) / max(1, len(predictions)),
+        }
+
+    translation_metrics = {
+        "rows": len(references),
+        "base": metric_bundle(base_predictions) if any(base_predictions) else None,
+        "lora": metric_bundle(lora_predictions),
+        "metric_note": "BLEU and chrF are SacreBLEU corpus metrics on the held-out test split; native-speaker review remains required.",
+    }
+    (ADAPTER_DIR / "translation_metrics.json").write_text(
+        json.dumps(translation_metrics, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    with (ADAPTER_DIR / "predictions.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["source", "reference", "base_prediction", "lora_prediction"])
+        writer.writeheader()
+        for source, reference, base_prediction, lora_prediction in zip(
+            sources, references, base_predictions, lora_predictions
+        ):
+            writer.writerow({
+                "source": source,
+                "reference": reference,
+                "base_prediction": base_prediction,
+                "lora_prediction": lora_prediction,
+            })
+
+    metrics["translation_metrics"] = translation_metrics
+    (ADAPTER_DIR / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
+    log(json.dumps(metrics, ensure_ascii=False, indent=2))
     log(f"Artifacts saved to {ADAPTER_DIR}")
 
 
