@@ -46,6 +46,7 @@ CRITICAL_PKGS = [
     "peft",
     "sentencepiece",
     "pandas",
+    "sacrebleu",
 ]
 
 LOCAL_MODEL_CANDIDATES = [
