@@ -38,7 +38,9 @@ HF_MODEL_ID = os.environ.get(
 SRC_LANG = "eng_Latn"
 TGT_LANG = "sat_Olck"
 OL_CHIKI = re.compile(r"[\u1C50-\u1C7F]")
-EPOCHS = float(os.environ.get("EPOCHS", "3"))
+# One epoch is the first reproducible validation run; increase explicitly
+# after the runtime and held-out metrics are confirmed.
+EPOCHS = float(os.environ.get("EPOCHS", "1"))
 
 CRITICAL_PKGS = [
     "transformers",

@@ -202,7 +202,7 @@ jobs:
           for attempt in $(seq 1 180); do
             status=$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)
             echo "[$attempt/180] $status"
-            if echo "$status" | grep -Eq 'COMPLETE|ERROR|FAILED'; then
+            if echo "$status" | grep -Eq 'COMPLETE|ERROR|FAILED|CANCELLED|CANCELED|CANCEL_ACKNOWLEDGED'; then
               final_status="$status"
               break
             fi
@@ -210,6 +210,10 @@ jobs:
           done
           if [ -z "$final_status" ]; then
             echo "Kaggle kernel did not finish within the wait window."
+            exit 1
+          fi
+          if echo "$final_status" | grep -Eq 'CANCELLED|CANCELED|CANCEL_ACKNOWLEDGED'; then
+            echo "Kaggle kernel was cancelled: $final_status"
             exit 1
           fi
           if echo "$final_status" | grep -Eq 'ERROR|FAILED'; then
