@@ -17,6 +17,7 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 import unicodedata
 from pathlib import Path
 
@@ -635,7 +636,11 @@ def train_lora(data_dir: Path) -> None:
         eval_steps=250,
         save_steps=250,
         logging_steps=25,
-        predict_with_generate=True,
+        # Generation is done explicitly below.  On some Kaggle Transformers
+        # builds Seq2SeqTrainer.predict() dispatches through the legacy
+        # IndicTrans2 remote-code path and the kernel exits without returning
+        # a useful traceback.
+        predict_with_generate=False,
         fp16=use_fp16,
         report_to="none",
         save_total_limit=2,
@@ -659,19 +664,35 @@ def train_lora(data_dir: Path) -> None:
     metrics = trainer.evaluate(tokenized["test"])
 
     def generated_predictions(active_model, split):
-        """Generate decoded predictions with the exact tokenizer/collator path."""
-        active_trainer = Seq2SeqTrainer(
-            model=active_model,
-            args=args,
-            processing_class=tokenizer,
-            data_collator=collator,
-        )
-        result = active_trainer.predict(split, metric_key_prefix="generation")
-        generated = result.predictions
-        if isinstance(generated, tuple):
-            generated = generated[0]
-        decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
-        return [unicodedata.normalize("NFC", value).strip() for value in decoded]
+        """Generate predictions without Seq2SeqTrainer's legacy predict path."""
+        active_model.eval()
+        device = next(active_model.parameters()).device
+        predictions = []
+        batch_size = max(1, int(args.per_device_eval_batch_size))
+        for start in range(0, len(split), batch_size):
+            examples = [split[index] for index in range(start, min(start + batch_size, len(split)))]
+            batch = collator(examples)
+            batch.pop("labels", None)
+            batch = {
+                key: value.to(device) if hasattr(value, "to") else value
+                for key, value in batch.items()
+            }
+            with torch.no_grad():
+                generated = active_model.generate(
+                    **batch,
+                    max_new_tokens=128,
+                    num_beams=4,
+                    early_stopping=True,
+                )
+            decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
+            predictions.extend(
+                unicodedata.normalize("NFC", value).strip() for value in decoded
+            )
+        if len(predictions) != len(split):
+            raise RuntimeError(
+                f"Generation alignment mismatch: expected {len(split)}, got {len(predictions)}"
+            )
+        return predictions
 
     raw_test = ds["test"]
     references = [unicodedata.normalize("NFC", value).strip() for value in raw_test["target"]]
@@ -731,10 +752,25 @@ def train_lora(data_dir: Path) -> None:
 def main() -> None:
     debug_layout()
     OUT.mkdir(parents=True, exist_ok=True)
-    install_deps()
-    data_dir = prepare_data()
-    train_lora(data_dir)
-    log("Done.")
+    try:
+        install_deps()
+        data_dir = prepare_data()
+        train_lora(data_dir)
+        log("Done.")
+    except Exception as error:
+        trace = traceback.format_exc()
+        (OUT / "failure_traceback.txt").write_text(trace, encoding="utf-8")
+        (OUT / "failure.json").write_text(
+            json.dumps(
+                {"error_type": type(error).__name__, "error": str(error)},
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        log(trace)
+        raise
 
 
 if __name__ == "__main__":
