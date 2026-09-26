@@ -50,13 +50,14 @@ CRITICAL_PKGS = [
     "sacrebleu",
 ]
 
-# The checkpoint's config.json declares Transformers 4.32.1. Newer Kaggle
-# images can import the model but produce all-NaN encoder states in this
-# legacy remote-code architecture. Keep the runtime aligned with the
-# checkpoint rather than accepting whatever image version happens to ship.
+# The checkpoint's config.json declares Transformers 4.32.1. Kaggle currently
+# runs Python 3.12, where that release's old tokenizers dependency has no
+# prebuilt wheel and fails during a Rust source build. Use the oldest
+# Python-3.12-compatible runtime that still predates the newer breaking
+# remote-code changes, rather than accepting the latest image version.
 COMPATIBLE_PIP_SPECS = [
-    "transformers==4.32.1",
-    "peft==0.10.0",
+    "transformers==4.44.2",
+    "peft==0.12.0",
 ]
 
 LOCAL_MODEL_CANDIDATES = [
