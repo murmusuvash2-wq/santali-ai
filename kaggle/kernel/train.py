@@ -50,6 +50,15 @@ CRITICAL_PKGS = [
     "sacrebleu",
 ]
 
+# The checkpoint's config.json declares Transformers 4.32.1. Newer Kaggle
+# images can import the model but produce all-NaN encoder states in this
+# legacy remote-code architecture. Keep the runtime aligned with the
+# checkpoint rather than accepting whatever image version happens to ship.
+COMPATIBLE_PIP_SPECS = [
+    "transformers==4.32.1",
+    "peft==0.10.0",
+]
+
 LOCAL_MODEL_CANDIDATES = [
     os.environ.get("MODEL_PATH", "").strip(),
     "/kaggle/input/indictrans2-en-indic-200m",
@@ -138,6 +147,11 @@ def install_transformers_compat() -> None:
 
 def install_deps() -> None:
     log("Checking training dependencies...")
+    for spec in COMPATIBLE_PIP_SPECS:
+        package = spec.split("==", 1)[0]
+        log(f"  enforcing checkpoint-compatible runtime: {spec}")
+        if not _pip_install(spec) or not _import_ok(package):
+            raise RuntimeError(f"Could not install checkpoint-compatible package: {spec}")
     missing = []
     for pkg in CRITICAL_PKGS:
         if _import_ok(pkg):
@@ -632,7 +646,7 @@ def train_lora(data_dir: Path) -> None:
         per_device_train_batch_size=2,
         per_device_eval_batch_size=2,
         gradient_accumulation_steps=8,
-        eval_strategy="steps",
+        evaluation_strategy="steps",
         eval_steps=250,
         save_steps=250,
         logging_steps=25,
@@ -651,7 +665,7 @@ def train_lora(data_dir: Path) -> None:
         args=args,
         train_dataset=tokenized["train"],
         eval_dataset=tokenized["validation"],
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
         data_collator=collator,
     )
 
